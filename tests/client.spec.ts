@@ -672,8 +672,10 @@ describe('分享按钮运行时', () => {
     ) as HTMLButtonElement
     expect(markdownButton.disabled).toBe(false)
     markdownButton.click()
+    expect(markdownButton.disabled).toBe(true)
+    await vi.waitFor(() => expect(downloadedFilename).toBe('dsh-测试对话.md'))
     expect(createdBlobs.some(blob => blob.type.startsWith('text/markdown'))).toBe(true)
-    expect(downloadedFilename).toBe('dsh-测试对话.md')
+    expect(markdownButton.disabled).toBe(false)
 
     await vi.waitFor(() => expect(fixture.scroll.querySelector('[data-dsh-share-format-trigger]')).not.toBeNull())
     fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-format-trigger]')!.click()

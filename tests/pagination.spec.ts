@@ -22,7 +22,7 @@ function fixture(heights: number[], turns = heights.map((_, index) => index + 1)
       { elements: [answer], role: 'assistant', turn, order: turn * 2 + 1, omittedBefore: 0 },
     ]
   })
-  // jsdom 没有排版：夹具统一按100px页边距/页脚及真实组间样式模拟页高。
+  // jsdom 没有排版：夹具统一按100px卡片边距及真实组间样式模拟页高。
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
     const height = 100
       + Array.from(this.querySelectorAll<HTMLElement>('[data-test-height]'), node => Number(node.dataset.testHeight)).reduce((a, b) => a + b, 0)
@@ -77,7 +77,7 @@ describe('按完整问答分页', () => {
         if (pages.elements.length > 1 && turns.length === 1) {
           expect(page.getBoundingClientRect().height).toBeGreaterThanOrEqual(1024)
         }
-        expect(page.querySelectorAll(':scope > footer')).toHaveLength(1)
+        expect(page.querySelectorAll(':scope > footer')).toHaveLength(0)
         expect(page.style.padding).toBe(card.element.style.padding)
         expect(page.style.width).toBe(card.element.style.width)
         expect(page.style.transform).toBe('')
@@ -92,7 +92,7 @@ describe('按完整问答分页', () => {
     expect(card.element.parentElement!.children).toHaveLength(1)
   })
 
-  it('末尾短页并入前页后恢复真实组间分隔，并只保留一个页脚', async () => {
+  it('末尾短页并入前页后恢复真实组间分隔', async () => {
     const card = fixture([5000, 500])
     const second = card.element.querySelector<HTMLElement>('[data-dsh-share-turn="2"]')!
     const before = second.getAttribute('style')
@@ -100,7 +100,7 @@ describe('按完整问答分页', () => {
     try {
       expect(pages.elements.map(turnsOnPage)).toEqual([['1', '2']])
       expect(pages.elements[0]!.querySelector('[data-dsh-share-turn="2"]')!.getAttribute('style')).toBe(before)
-      expect(pages.elements[0]!.querySelectorAll(':scope > footer')).toHaveLength(1)
+      expect(pages.elements[0]!.querySelectorAll(':scope > footer')).toHaveLength(0)
       expect(pages.elements[0]!.getBoundingClientRect().height).toBe(5660)
     } finally {
       pages.dispose()
@@ -113,7 +113,7 @@ describe('按完整问答分页', () => {
     try {
       expect(pages.elements.map(turnsOnPage)).toEqual([['1', '4', '8']])
       expect(pages.elements[0]!.querySelectorAll('[data-dsh-share-omission]')).toHaveLength(2)
-      expect(pages.elements[0]!.querySelectorAll(':scope > footer')).toHaveLength(1)
+      expect(pages.elements[0]!.querySelectorAll(':scope > footer')).toHaveLength(0)
     } finally {
       pages.dispose()
     }
@@ -135,7 +135,7 @@ describe('按完整问答分页', () => {
     }
   })
 
-  it('真正的省略标记只随下一组移动，页脚和主题随每页保留', async () => {
+  it('真正的省略标记只随下一组移动，主题随每页保留', async () => {
     const card = fixture([4100, 2100], [1, 4])
     card.element.style.setProperty('--dsw-alias-label-primary', '#eeeeee')
     const pages = await createSharePages(card.element)
@@ -145,7 +145,6 @@ describe('按完整问答分页', () => {
       expect(pages.elements[1]!.firstElementChild!.hasAttribute('data-dsh-share-omission')).toBe(true)
       for (const page of pages.elements) {
         expect(page.style.getPropertyValue('--dsw-alias-label-primary')).toBe('#eeeeee')
-        expect(page.querySelector('[data-dsh-share-badge]')!.textContent).toBe('HARNESS')
       }
     } finally {
       pages.dispose()

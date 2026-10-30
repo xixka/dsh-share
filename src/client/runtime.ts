@@ -542,22 +542,28 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       if (!messages.length) return
       const locale = currentLocale()
       const title = controller.title
-      if (format === 'markdown') {
-        downloadMarkdownFile(document, createShareMarkdown(messages, locale, ensureDialog().settings), title)
-        htmlStatus.textContent = ''
-        return
-      }
       download.dataset.busy = 'true'
       download.disabled = true
       controller.downloadFormat?.update(locale, true)
-      htmlStatus.textContent = t(locale).htmlExporting
+      htmlStatus.textContent = format === 'markdown' ? t(locale).markdownExporting : t(locale).htmlExporting
       try {
-        const result = await createShareHtml(document, messages, locale, ensureDialog().settings)
-        if (!footer.isConnected) return
-        downloadHtmlFile(document, result.html, title)
-        htmlStatus.textContent = result.missingImages ? t(currentLocale()).htmlMissingImages : ''
+        if (format === 'markdown') {
+          const markdown = await createShareMarkdown(messages, locale, ensureDialog().settings)
+          if (!footer.isConnected) return
+          downloadMarkdownFile(document, markdown, title)
+          htmlStatus.textContent = ''
+        } else {
+          const result = await createShareHtml(document, messages, locale, ensureDialog().settings)
+          if (!footer.isConnected) return
+          downloadHtmlFile(document, result.html, title)
+          htmlStatus.textContent = result.missingImages ? t(currentLocale()).htmlMissingImages : ''
+        }
       } catch {
-        if (footer.isConnected) htmlStatus.textContent = t(currentLocale()).htmlExportFailed
+        if (footer.isConnected) {
+          htmlStatus.textContent = format === 'markdown'
+            ? t(currentLocale()).markdownExportFailed
+            : t(currentLocale()).htmlExportFailed
+        }
       } finally {
         delete download.dataset.busy
         download.disabled = controller.selected.size === 0

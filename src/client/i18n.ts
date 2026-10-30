@@ -36,6 +36,8 @@ export interface Translation {
   htmlExporting: string
   htmlExportFailed: string
   htmlMissingImages: string
+  markdownExporting: string
+  markdownExportFailed: string
   downloadMarkdownCompact: string
   copied: string
   copyUnsupported: string
@@ -93,6 +95,8 @@ export function t(locale: ShareLocale): Translation {
       htmlExporting: '正在生成 HTML…',
       htmlExportFailed: 'HTML 生成失败，请重试。',
       htmlMissingImages: '部分图片无法内嵌，已在 HTML 中标记。',
+      markdownExporting: '正在生成 Markdown…',
+      markdownExportFailed: 'Markdown 生成失败，请重试。',
       downloadMarkdownCompact: '下载MD',
       copied: '图片已复制',
       copyUnsupported: '当前浏览器不支持复制图片，请下载 PNG。',
@@ -145,6 +149,8 @@ export function t(locale: ShareLocale): Translation {
     htmlExporting: 'Generating HTML…',
     htmlExportFailed: 'Could not generate HTML. Please try again.',
     htmlMissingImages: 'Some images could not be embedded and are marked in the HTML.',
+    markdownExporting: 'Generating Markdown…',
+    markdownExportFailed: 'Could not generate Markdown. Please try again.',
     downloadMarkdownCompact: 'Markdown',
     copied: 'Image copied',
     copyUnsupported: 'Image clipboard is unavailable. Please download the PNG.',

@@ -6,15 +6,6 @@ import { createShareCard } from '../src/client/card.ts'
 import type { ShareMessage } from '../src/client/content.ts'
 import { STYLE_TEXT } from '../src/client/styles.ts'
 
-it.each([false, true])('fallback HARNESS 徽标前景背景分离，暗色=%s', (dark) => {
-  document.body.toggleAttribute('data-ds-dark-theme', dark)
-  const card = createShareCard(document, [], 'zh')
-  const badge = card.element.querySelector<HTMLElement>('[data-dsh-share-badge]')!
-  expect(badge.style.color).toBe('rgb(255, 255, 255)')
-  expect(badge.style.background).toBe('rgb(17, 24, 39)')
-  card.dispose()
-})
-
 function pair(
   prompt: HTMLElement,
   answers: HTMLElement[],
@@ -326,8 +317,8 @@ describe('分享图片卡片', () => {
     expect(card.element.style.width).toBe('768px')
     expect(card.element.style.getPropertyValue('--dsh-share-font-size')).toBe('18px')
     expect(card.element.querySelectorAll('[data-dsh-share-message]')).toHaveLength(2)
-    expect(card.element.querySelector('[data-dsh-share-wordmark]')?.textContent).toContain('deepseek')
-    expect(card.element.querySelector('footer')?.style.justifyContent).toBe('center')
+    expect(card.element.querySelector('[data-dsh-share-wordmark]')).toBeNull()
+    expect(card.element.querySelector(':scope > footer')).toBeNull()
     card.dispose()
   })
 
@@ -353,29 +344,7 @@ describe('分享图片卡片', () => {
     expect(text.indexOf('问题 一')).toBeLessThan(text.indexOf('回答 三'))
     expect(card.element.querySelectorAll('[data-dsh-share-turn]')).toHaveLength(4)
     expect(card.element.querySelector('[data-dsh-share-omission]')?.textContent).toBe('···')
-    expect(card.element.querySelectorAll('footer')).toHaveLength(1)
-    card.dispose()
-  })
-
-  it('复用页面侧边栏的完整品牌字标', () => {
-    document.body.innerHTML = `
-      <svg id="sidebar-wordmark" style="--dsw-alias-label-primary-inverted:rgb(250, 250, 250)" viewBox="0 0 182 24">
-        <path d="M0 0h24v24z"/>
-      </svg>`
-    const prompt = document.createElement('div')
-    prompt.textContent = '问题'
-    const answer = document.createElement('div')
-    answer.textContent = '回答'
-
-    const card = createShareCard(document, pair(prompt, [answer]), 'zh')
-    const wordmark = card.element.querySelector<SVGSVGElement>('[data-dsh-share-wordmark] svg')
-
-    expect(wordmark?.getAttribute('viewBox')).toBe('0 0 182 24')
-    expect(wordmark?.getAttribute('id')).toBe('sidebar-wordmark')
-    expect(wordmark?.getAttribute('width')).toBe('137')
-    expect(wordmark?.getAttribute('height')).toBe('18')
-    expect(wordmark?.parentElement?.style.getPropertyValue('--dsw-alias-label-primary-inverted'))
-      .toBe('rgb(250, 250, 250)')
+    expect(card.element.querySelectorAll('footer')).toHaveLength(0)
     card.dispose()
   })
 

@@ -6,13 +6,20 @@ import { DEFAULT_SHARE_SETTINGS } from '../src/client/settings.ts'
 import { snapshotElements } from '../src/client/dom.ts'
 import { HTML_STYLE } from '../src/client/html-style.ts'
 
+const toPng = vi.hoisted(() => vi.fn())
+vi.mock('html-to-image', () => ({ toPng }))
+
 function message(html: string, role: 'user' | 'assistant' = 'user'): ShareMessage {
   const element = document.createElement('div')
   element.innerHTML = html
   return { elements: [element], role, turn: 1, order: 1, omittedBefore: 0 }
 }
 
-afterEach(() => { vi.unstubAllGlobals(); document.body.innerHTML = '' })
+afterEach(() => {
+  vi.unstubAllGlobals()
+  document.body.innerHTML = ''
+  toPng.mockReset()
+})
 
 describe('独立 HTML 导出', () => {
   it('使用轻量会话布局，不加入大卡片标题和角色标题', async () => {
@@ -111,6 +118,25 @@ describe('独立 HTML 导出', () => {
     expect(result.html).toContain('保留正文')
     expect(result.missingImages).toBe(1)
     expect(result.html).not.toContain('https://example.org/image')
+  })
+
+  it('将 GenUI 的 SVG、画布和样式内容导出为内嵌静态图', async () => {
+    const entry = message('<div data-genui-artifact><div data-genui><strong>仪表盘</strong><svg><path /></svg><canvas></canvas><button>筛选</button></div></div>', 'assistant')
+    const source = entry.elements[0]!
+    const before = source.outerHTML
+    toPng.mockResolvedValue('data:image/png;base64,AQID')
+
+    const result = await createShareHtml(document, [entry], 'zh', DEFAULT_SHARE_SETTINGS)
+    const parsed = new DOMParser().parseFromString(result.html, 'text/html')
+    const image = parsed.querySelector<HTMLImageElement>('img.genui')!
+
+    expect(image.src).toBe('data:image/png;base64,AQID')
+    expect(image.alt).toBe('GenUI 交互组件')
+    expect(parsed.querySelector('svg,canvas,button')).toBeNull()
+    expect(result.missingImages).toBe(0)
+    expect(toPng).toHaveBeenCalledOnce()
+    expect(source.outerHTML).toBe(before)
+    expect(document.querySelector('[data-dsh-share-genui-host]')).toBeNull()
   })
 
   it('遵守隐藏过程设置，并在异步读取前固定内容', async () => {

@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createShareMarkdown } from '../src/client/markdown.ts'
 import type { ShareMessage } from '../src/client/content.ts'
+
+const toPng = vi.hoisted(() => vi.fn())
+vi.mock('html-to-image', () => ({ toPng }))
+
+afterEach(() => {
+  document.body.innerHTML = ''
+  toPng.mockReset()
+})
 
 function user(turn: number, order: number, omittedBefore = 0): ShareMessage {
   const prompt = document.createElement('div')
@@ -31,8 +39,8 @@ function assistant(turn: number, order: number, omittedBefore = 0, process = fal
 }
 
 describe('Markdown 导出', () => {
-  it('按问答组保留角色、列表、代码块和工具摘要，并标记不连续选择', () => {
-    const markdown = createShareMarkdown([
+  it('按问答组保留角色、列表、代码块和工具摘要，并标记不连续选择', async () => {
+    const markdown = await createShareMarkdown([
       user(1, 2),
       assistant(1, 3, 0, true),
       user(3, 6, 1),
@@ -49,11 +57,11 @@ describe('Markdown 导出', () => {
     expect(markdown.indexOf('问题 1')).toBeLessThan(markdown.indexOf('回答 3'))
   })
 
-  it('底层转换器仍能处理单独的用户或回答片段', () => {
-    const onlyUser = createShareMarkdown([
+  it('底层转换器仍能处理单独的用户或回答片段', async () => {
+    const onlyUser = await createShareMarkdown([
       user(2, 4),
     ], 'zh', { width: 'tablet', fontSize: 'normal', hideProcess: false })
-    const onlyAssistant = createShareMarkdown([
+    const onlyAssistant = await createShareMarkdown([
       assistant(2, 5),
     ], 'zh', { width: 'tablet', fontSize: 'normal', hideProcess: false })
 
@@ -63,8 +71,8 @@ describe('Markdown 导出', () => {
     expect(onlyAssistant).not.toContain('## 用户')
   })
 
-  it('不展示过程时同步移除 Think、工具调用和中间回答', () => {
-    const markdown = createShareMarkdown([
+  it('不展示过程时同步移除 Think、工具调用和中间回答', async () => {
+    const markdown = await createShareMarkdown([
       assistant(1, 3, 0, true),
     ], 'zh', { width: 'tablet', fontSize: 'normal', hideProcess: true })
 
@@ -74,13 +82,13 @@ describe('Markdown 导出', () => {
     expect(markdown).not.toContain('中间回答')
   })
 
-  it('按 alpha.3 的过程成员标记保留展开状态下的最终回答', () => {
+  it('按 alpha.3 的过程成员标记保留展开状态下的最终回答', async () => {
     const message = assistant(2, 5, 0, true)
     const [intermediate, tool, answer] = message.elements
     intermediate?.setAttribute('data-turn-process-member', 'true')
     tool?.setAttribute('data-turn-process-member', 'true')
 
-    const markdown = createShareMarkdown([
+    const markdown = await createShareMarkdown([
       message,
     ], 'zh', { width: 'tablet', fontSize: 'normal', hideProcess: true })
 
@@ -88,5 +96,41 @@ describe('Markdown 导出', () => {
     expect(markdown).not.toContain('Think')
     expect(markdown).not.toContain('Bash')
     expect(markdown).not.toContain('中间回答')
+  })
+
+  it('将 GenUI 渲染内容内嵌为静态图片并清理临时节点', async () => {
+    const entry = assistant(2, 5)
+    const source = entry.elements[0]!
+    source.innerHTML = '<p>图表前</p><div data-genui-artifact><div data-genui><strong>销售趋势</strong><svg><path /></svg><canvas></canvas><button>筛选</button></div></div><p>图表后</p>'
+    const before = source.outerHTML
+    toPng.mockImplementation(async (element: HTMLElement) => {
+      expect(element.hasAttribute('data-genui')).toBe(true)
+      expect(element.querySelector('svg,canvas')).not.toBeNull()
+      expect(element.querySelector('button')).toBeNull()
+      return 'data:image/png;base64,AQID'
+    })
+
+    const markdown = await createShareMarkdown([entry], 'zh', {
+      width: 'tablet', fontSize: 'normal', hideProcess: false,
+    })
+
+    expect(markdown).toContain('图表前')
+    expect(markdown).toContain('![GenUI 交互组件](data:image/png;base64,AQID)')
+    expect(markdown).toContain('图表后')
+    expect(markdown).not.toContain('销售趋势')
+    expect(toPng).toHaveBeenCalledOnce()
+    expect(source.outerHTML).toBe(before)
+    expect(document.querySelector('[data-dsh-share-genui-host]')).toBeNull()
+  })
+
+  it('GenUI 静态化失败时不返回缺失组件的文件', async () => {
+    const entry = assistant(2, 5)
+    entry.elements[0]!.innerHTML = '<div data-genui><canvas></canvas></div>'
+    toPng.mockRejectedValue(new Error('tainted canvas'))
+
+    await expect(createShareMarkdown([entry], 'zh', {
+      width: 'tablet', fontSize: 'normal', hideProcess: false,
+    })).rejects.toThrow('tainted canvas')
+    expect(document.querySelector('[data-dsh-share-genui-host]')).toBeNull()
   })
 })

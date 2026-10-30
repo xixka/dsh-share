@@ -3,6 +3,7 @@ import { gfm } from 'turndown-plugin-gfm'
 import type { ShareMessage } from './content.ts'
 import { cloneShareMessage, visibleAssistantElements } from './card.ts'
 import type { ShareSettings } from './settings.ts'
+import { replaceGenuiWithImages } from './static-genui.ts'
 
 function createConverter(): TurndownService {
   const converter = new TurndownService({
@@ -37,24 +38,29 @@ function createConverter(): TurndownService {
   return converter
 }
 
-function convertMessages(
+async function convertMessages(
   converter: TurndownService,
   messages: readonly HTMLElement[],
   locale: 'zh' | 'en',
+  settings: ShareSettings,
   hideReasoning = false,
-): string {
-  return messages
-    .map(message => converter.turndown(cloneShareMessage(message, locale, hideReasoning)).trim())
-    .filter(Boolean)
-    .join('\n\n')
+): Promise<string> {
+  const parts: string[] = []
+  for (const message of messages) {
+    const clone = cloneShareMessage(message, locale, hideReasoning)
+    await replaceGenuiWithImages(clone, locale, settings)
+    const content = converter.turndown(clone).trim()
+    if (content) parts.push(content)
+  }
+  return parts.join('\n\n')
 }
 
 /** 将与 PNG 相同的可见内容导出为按原会话顺序排列的 GFM Markdown。 */
-export function createShareMarkdown(
+export async function createShareMarkdown(
   messages: readonly ShareMessage[],
   locale: 'zh' | 'en',
   settings: ShareSettings,
-): string {
+): Promise<string> {
   const converter = createConverter()
   const parts = [locale === 'zh' ? '# 对话分享' : '# Shared conversation']
 
@@ -68,10 +74,11 @@ export function createShareMarkdown(
     const elements = message.role === 'assistant'
       ? visibleAssistantElements(message.elements, settings.hideProcess)
       : message.elements
-    const content = convertMessages(
+    const content = await convertMessages(
       converter,
       elements,
       locale,
+      settings,
       message.role === 'assistant' && settings.hideProcess,
     )
     parts.push(`${message.role === 'user'

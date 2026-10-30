@@ -7,12 +7,11 @@ interface SharePages {
 }
 
 /** 只在已知的问答边界分组，省略标记随下一轮一起移动。 */
-function collectTurnGroups(card: HTMLElement, footer: HTMLElement): HTMLElement[][] {
+function collectTurnGroups(card: HTMLElement): HTMLElement[][] {
   const groups: HTMLElement[][] = []
   let previousTurn: string | undefined
   let pending: HTMLElement[] = []
   for (const child of Array.from(card.children) as HTMLElement[]) {
-    if (child === footer) continue
     if (child.hasAttribute('data-dsh-share-omission')) {
       pending.push(child)
       continue
@@ -50,19 +49,17 @@ export async function createSharePages(element: HTMLElement): Promise<SharePages
         return image.decode?.().catch(() => {})
       }),
     ])
-    const footer = copy.querySelector<HTMLElement>(':scope > footer')
-    if (!copy.hasAttribute('data-dsh-share-card') || !footer
+    if (!copy.hasAttribute('data-dsh-share-card')
       || Math.ceil(copy.getBoundingClientRect().height) <= PAGE_HEIGHT) {
       return { elements: [copy], dispose }
     }
-    const groups = collectTurnGroups(copy, footer)
+    const groups = collectTurnGroups(copy)
     if (groups.length < 2) return { elements: [copy], dispose }
 
     const starts = new Map(groups.map(group => [group[0]!, group[0]!.getAttribute('style')]))
     const pages: { element: HTMLElement, groups: HTMLElement[][] }[] = []
     const newPage = () => {
       const element = copy.cloneNode(false) as HTMLElement
-      element.append(footer.cloneNode(true))
       temporary.at(-1)!.after(element)
       temporary.push(element)
       const page = { element, groups: [] as HTMLElement[][] }
@@ -76,7 +73,7 @@ export async function createSharePages(element: HTMLElement): Promise<SharePages
         page = newPage()
       }
       if (!page.groups.length) resetPageStart(group)
-      page.element.lastElementChild!.before(...group)
+      page.element.append(...group)
       page.groups.push(group)
     }
 
@@ -93,7 +90,7 @@ export async function createSharePages(element: HTMLElement): Promise<SharePages
       // 新页首重新成为组间边界时，恢复原分隔线或省略标记的样式。
       if (style == null) first.removeAttribute('style')
       else first.setAttribute('style', style)
-      target.element.lastElementChild!.before(...following.groups.flat())
+      target.element.append(...following.groups.flat())
       target.groups.push(...following.groups)
       following.element.remove()
       pages.splice(targetIndex + 1, 1)

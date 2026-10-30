@@ -3,6 +3,7 @@ import type { ShareMessage } from './content.ts'
 import type { ShareSettings } from './settings.ts'
 import { applyHtmlExportTheme } from './export-theme.ts'
 import { HTML_STYLE } from './html-style.ts'
+import { replaceGenuiWithImages } from './static-genui.ts'
 
 const TAGS = new Set('div p span br hr h1 h2 h3 h4 h5 h6 strong b em i u s del blockquote pre code ul ol li table thead tbody tfoot tr th td caption a sub sup details summary'.split(' '))
 const DROP = new Set('script style link meta base iframe object embed form input button textarea select template svg canvas audio video source'.split(' '))
@@ -54,6 +55,9 @@ export async function createShareHtml(
       ? visibleAssistantElements(message.elements, settings.hideProcess) : message.elements)
       .map(element => cloneShareMessage(element, locale, message.role === 'assistant' && settings.hideProcess)),
   }))
+  for (const message of snapshots) {
+    for (const element of message.elements) await replaceGenuiWithImages(element, locale, settings)
+  }
   let missingImages = 0
   let totalBytes = 0
   let imageCount = 0
@@ -102,7 +106,8 @@ export async function createShareHtml(
       totalBytes += cached.size
       image.src = cached.data
       const height = Number.parseFloat(source.getAttribute('height') ?? (source as HTMLElement).style?.height ?? '')
-      if ((height > 0 && height <= 64) || source.getAttribute('src')?.includes('/api/dsh-emoji/assets/')) image.className = 'emoji'
+      if (source.hasAttribute('data-dsh-share-genui')) image.className = 'genui'
+      else if ((height > 0 && height <= 64) || source.getAttribute('src')?.includes('/api/dsh-emoji/assets/')) image.className = 'emoji'
       return image
     } catch {
       missingImages++
