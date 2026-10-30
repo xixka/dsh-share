@@ -279,6 +279,40 @@ describe('分享图片卡片', () => {
     cleanCard.dispose()
   })
 
+  it('隐藏过程时按原顺序保留全部最终回答分段', () => {
+    const prompt = document.createElement('div')
+    prompt.textContent = '问题'
+    const reasoning = document.createElement('div')
+    reasoning.dataset.chatFlowKind = 'assistant-step'
+    reasoning.dataset.chatGroupPart = 'reasoning'
+    reasoning.dataset.turnProcessMember = 'true'
+    reasoning.textContent = '思考过程'
+    const firstAnswer = document.createElement('div')
+    firstAnswer.dataset.chatFlowKind = 'assistant-step'
+    firstAnswer.dataset.chatGroupPart = 'response'
+    firstAnswer.textContent = '最终回答第一段'
+    const secondAnswer = document.createElement('div')
+    secondAnswer.dataset.chatFlowKind = 'assistant-step'
+    secondAnswer.dataset.chatGroupPart = 'response'
+    secondAnswer.dataset.turnProcessAnswer = 'true'
+    secondAnswer.textContent = '最终回答第二段'
+
+    const card = createShareCard(
+      document,
+      pair(prompt, [reasoning, firstAnswer, secondAnswer]),
+      'zh',
+      { width: 'tablet', fontSize: 'normal', hideProcess: true },
+    )
+
+    const text = card.element.textContent ?? ''
+    expect(text).toContain('最终回答第一段')
+    expect(text).toContain('最终回答第二段')
+    expect(text.indexOf('最终回答第一段')).toBeLessThan(text.indexOf('最终回答第二段'))
+    expect(text).not.toContain('思考过程')
+    expect(card.element.querySelectorAll('[data-dsh-share-message-group="assistant"] > [data-dsh-share-message]')).toHaveLength(2)
+    card.dispose()
+  })
+
   it('按预设设置图片宽度和正文基准字号', () => {
     const prompt = document.createElement('div')
     prompt.textContent = '问题'

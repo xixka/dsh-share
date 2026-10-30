@@ -150,7 +150,9 @@ export function visibleAssistantElements(
   const assistantSteps = elements.filter(element =>
     element.dataset.chatFlowKind === 'assistant-step' && element.dataset.chatGroupPart !== 'reasoning',
   )
-  const explicitAnswers = assistantSteps.filter(element => element.dataset.turnProcessAnswer === 'true')
+  const explicitAnswers = assistantSteps.filter(element =>
+    element.dataset.turnProcessAnswer === 'true' || element.dataset.chatGroupPart === 'response',
+  )
   if (explicitAnswers.length > 0) return explicitAnswers
 
   const hasTurnProcessMembers = elements.some(element => element.dataset.turnProcessMember === 'true')
