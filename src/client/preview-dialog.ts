@@ -21,7 +21,7 @@ const TRANSPARENT_IMAGE_PLACEHOLDER =
 // 保守导出预算，不代表浏览器硬上限；倍率不足以容纳完整内容时明确失败。
 const MAX_IMAGE_SIDE = 32767
 const MAX_IMAGE_AREA = 32 * 1024 * 1024
-const IMAGE_PIXEL_RATIOS = [2, 1, 0.5] as const
+const IMAGE_PIXEL_RATIOS = [2, 1, 0.5, 0.25, 0.125] as const
 
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>
 

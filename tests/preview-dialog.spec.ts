@@ -39,7 +39,7 @@ describe('分享图渲染', () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 768, height: 9000 } as DOMRect)
     toBlob.mockResolvedValueOnce(null)
     await expect(renderShareImage(element)).rejects.toThrow('complete image')
-    expect(toBlob.mock.calls.map(([, options]) => options.pixelRatio)).toEqual([2, 1, 0.5])
+    expect(toBlob.mock.calls.map(([, options]) => options.pixelRatio)).toEqual([2, 1, 0.5, 0.25, 0.125])
     expect(document.body.children).toHaveLength(1)
   })
 
@@ -49,6 +49,8 @@ describe('分享图渲染', () => {
     { width: 768, height: 20000, ratio: 1 },
     { width: 768, height: 40000, ratio: 0.5 },
     { width: 768, height: 65534, ratio: 0.5 },
+    { width: 768, height: 65536, ratio: 0.25 },
+    { width: 768, height: 200000, ratio: 0.125 },
   ])('按单边及面积预算降低倍率，保持完整排版：$width × $height', async ({ width, height, ratio }) => {
     const { renderShareImage } = await import('../src/client/preview-dialog.ts')
     const element = document.createElement('article')
@@ -78,7 +80,7 @@ describe('分享图渲染', () => {
     expect(document.body.children).toHaveLength(1)
   })
 
-  it.each([65536, Number.POSITIVE_INFINITY, Number.NaN, 0])('完整图片无法在最低倍率预算内导出时明确失败：%s', async height => {
+  it.each([262144, Number.POSITIVE_INFINITY, Number.NaN, 0])('完整图片无法在最低倍率预算内导出时明确失败：%s', async height => {
     const { renderShareImage } = await import('../src/client/preview-dialog.ts')
     const element = document.createElement('article')
     document.body.append(element)

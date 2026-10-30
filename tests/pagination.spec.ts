@@ -217,7 +217,7 @@ describe('按完整问答分页', () => {
     const card = fixture([4100, 2500])
     toBlob.mockResolvedValueOnce(new Blob(['png'])).mockResolvedValueOnce(null)
     await expect(renderShareImage(card.element)).rejects.toThrow('complete image')
-    expect(toBlob.mock.calls.map(([, options]) => options.pixelRatio)).toEqual([2, 2, 1, 0.5])
+    expect(toBlob.mock.calls.map(([, options]) => options.pixelRatio)).toEqual([2, 2, 1, 0.5, 0.25, 0.125])
     expect(card.element.parentElement!.children).toHaveLength(1)
   })
 })
