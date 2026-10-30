@@ -56,25 +56,28 @@ function packReport(overrides: Record<string, unknown> = {}) {
   }])
 }
 
-describe('npm 发布边界', () => {
-  it('由版本 tag 自动发布 npm 包并创建 GitHub Release', () => {
+describe('发布边界', () => {
+  it('由版本 tag 在本仓库创建 GitHub Release 并附带发布包', () => {
     const workflow = readFileSync(
       new URL('../.github/workflows/release.yml', import.meta.url),
       'utf8',
     )
 
     expect(workflow).toMatch(/push:\n\s+tags:\n\s+- 'v\*'/)
+    expect(workflow).toContain('workflow_dispatch:')
     expect(workflow).toContain('contents: write')
-    expect(workflow).toContain('id-token: write')
+    expect(workflow).not.toContain('id-token: write')
     expect(workflow).toContain('pnpm install --frozen-lockfile')
     expect(workflow).toContain('pnpm release:check')
     expect(workflow).toContain('git diff --exit-code')
-    expect(workflow).toContain('GITHUB_REF_NAME#v')
+    expect(workflow).toContain('TAG_NAME="${{ inputs.tag || github.ref_name }}"')
+    expect(workflow).toContain('TAG_VERSION="${TAG_NAME#v}"')
     expect(workflow).toContain('if [[ "$TAG_TYPE" != "tag" ]]')
-    expect(workflow).toContain('Release tag $GITHUB_REF_NAME must be an annotated tag')
+    expect(workflow).toContain('Release tag $TAG_NAME must be an annotated tag')
     expect(workflow).toContain('git merge-base --is-ancestor "$TAG_COMMIT" origin/main')
-    expect(workflow).toContain('NPM_TAG="${PRERELEASE_ID%%.*}"')
-    expect(workflow).toContain('npm publish "$TARBALL" --provenance --access public --tag "$NPM_TAG"')
+    expect(workflow).toContain('npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"')
+    expect(workflow).not.toContain('npm publish')
+    expect(workflow).not.toContain('registry.npmjs.org')
     expect(workflow).toContain('RELEASE_ARGS+=(--prerelease)')
     expect(workflow).toContain('gh release create "${RELEASE_ARGS[@]}"')
   })
