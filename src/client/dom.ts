@@ -37,7 +37,7 @@ export function snapshotTurnContent(content: TurnContent): TurnContent {
 
 /**
  * 这里集中保存当前 DSH 页面结构的假设，方便上游 DOM 调整后只改一个地方。
- * 从 turn-tail 回溯到本轮 user，并展开过程分组中的消息座位，保留原始顺序。
+ * 从 turn-tail 回溯到本轮开场输入（user 或 steering），并展开过程分组中的消息座位，保留原始顺序。
  */
 export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
   const flowTail = tail.closest<HTMLElement>(TURN_FLOW_SELECTOR)
@@ -46,7 +46,6 @@ export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
   const prompts: HTMLElement[] = []
   const answers: HTMLElement[] = []
   let sibling = flowTail.previousElementSibling
-  let foundStart = false
 
   while (sibling instanceof HTMLElement) {
     const kind = sibling.dataset.chatFlowKind
@@ -64,7 +63,6 @@ export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
       prompts.unshift(sibling)
     } else if (kind === 'user') {
       prompts.unshift(sibling)
-      foundStart = true
       break
     } else if (kind === 'turn-tail') {
       break
@@ -73,7 +71,8 @@ export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
     sibling = sibling.previousElementSibling
   }
 
-  if (!foundStart || prompts.length === 0 || answers.length === 0) return undefined
+  // DSH 会把被认领进运行中一轮的用户消息渲染成 steering，这类轮次没有 user 节点，同样以 steering 开场。
+  if (prompts.length === 0 || answers.length === 0) return undefined
   return { prompts, answers, tail }
 }
 

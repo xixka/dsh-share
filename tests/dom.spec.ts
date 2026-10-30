@@ -48,6 +48,22 @@ describe('DSH 对话 DOM 适配', () => {
     expect(content?.answers.map((item) => item.id)).toEqual(['answer-1', 'tool-call', 'answer-2'])
   })
 
+  it('回溯收集以 steering 开场、没有 user 节点的轮次', () => {
+    document.body.innerHTML = `
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="old"><div><button></button></div></div></div>
+      <div data-chat-flow-kind="command"><div>/plan 命令行</div></div>
+      <div data-chat-flow-kind="steering" id="opening"><div>开场问题</div></div>
+      <div data-chat-flow-kind="context"><div>注入上下文</div></div>
+      <div data-chat-flow-kind="assistant-step" id="answer"><div>回答</div></div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="current"><div class="actions"><button></button></div></div></div>`
+    const tail = document.querySelector('[data-turn-tail="current"]') as HTMLElement
+
+    const content = findTurnContent(tail)
+
+    expect(content?.prompts.map((item) => item.id)).toEqual(['opening'])
+    expect(content?.answers.map((item) => item.id)).toEqual(['answer'])
+  })
+
   it('从官方操作插槽中的按钮找到当前轮内容', () => {
     const tail = renderFixture()
     const action = document.createElement('button')

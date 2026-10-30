@@ -439,6 +439,53 @@ describe('分享按钮运行时', () => {
     runtime.dispose()
   })
 
+  it('以 steering 开场的问答组同样可全选并生成图片', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => `blob:dsh-share-steering-${Math.random()}`),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    const followUp = document.createElement('div')
+    followUp.innerHTML = `
+      <div data-chat-flow-kind="command"><div>/plan 命令行</div></div>
+      <div data-chat-flow-kind="steering"><div data-time-hover-root><p>追问 second</p><div><button>复制</button></div></div></div>
+      <div data-chat-flow-kind="context"><div>注入上下文</div></div>
+      <div data-chat-flow-kind="assistant-step"><article><p>回答 second</p></article></div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="2"><div><button>复制</button><button>分支</button></div></div></div>`
+    fixture.column.append(...Array.from(followUp.children))
+    const rendered: HTMLElement[] = []
+    const renderImage = vi.fn(async (element: HTMLElement) => {
+      rendered.push(element.cloneNode(true) as HTMLElement)
+      return new Blob(['png'], { type: 'image/png' })
+    })
+    const runtime = createShareRuntime(document, { renderImage })
+
+    clickHeaderShare(runtime, fixture.source)
+
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      active: true,
+      allSelected: true,
+      count: 2,
+      total: 2,
+    })
+    const checkboxes = fixture.scroll.querySelectorAll<HTMLButtonElement>('[data-dsh-share-turn-select]')
+    expect(checkboxes).toHaveLength(4)
+    expect(fixture.column.querySelector(
+      '[data-chat-flow-kind="steering"] > [data-dsh-share-select-region="question"] [data-dsh-share-turn-select]',
+    )).not.toBeNull()
+
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
+    await vi.waitFor(() => expect(renderImage).toHaveBeenCalledOnce())
+    const text = rendered[0]?.textContent ?? ''
+    expect(text).toContain('问题 first')
+    expect(text).toContain('追问 second')
+    expect(text).toContain('回答 second')
+
+    runtime.dispose()
+  })
+
   it('点击问题或回答正文会切换整组选择，并阻止原内容交互穿透', () => {
     const fixture = createConversation()
     addTurn(fixture, 'first', 1, true)
