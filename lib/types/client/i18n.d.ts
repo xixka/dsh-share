@@ -32,6 +32,7 @@ export interface Translation {
     htmlExporting: string;
     htmlExportFailed: string;
     htmlMissingImages: string;
+    imageMissingImages(count: number): string;
     markdownExporting: string;
     markdownExportFailed: string;
     downloadMarkdownCompact: string;

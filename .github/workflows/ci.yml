@@ -23,9 +23,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm release:check
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lib-${{ github.sha }}
-          path: lib
-          retention-days: 1
       - run: git diff --exit-code

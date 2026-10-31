@@ -1,5 +1,7 @@
 import { type ShareLocale } from './i18n.ts';
 import { type ShareSettings } from './settings.ts';
+/** 导出前检查卡片里的图片，无法内嵌的替换为可见占位并返回数量，避免在导出图里静默消失。 */
+export declare function markUnembeddableImages(card: HTMLElement, locale: 'zh' | 'en'): Promise<number>;
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>;
 export declare function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]>;
 export declare function downloadMarkdownFile(document: Document, markdown: string, title?: string): void;
@@ -33,6 +35,7 @@ export declare class PreviewDialog {
     private pages;
     private pageUrls;
     private pageIndex;
+    private missingImages;
     private archiveJob?;
     private readonly pager;
     private readonly previousPage;
@@ -47,9 +50,11 @@ export declare class PreviewDialog {
     /** 设置连续变化时先保留当前预览，只更新轻量状态；图片稍后统一重算。 */
     showPendingUpdate(): void;
     /** 先在独立 img 中完成解码，再原位替换当前预览，避免出现空白帧。 */
-    showResult(result: Blob | Blob[], isCurrent?: () => boolean): Promise<boolean>;
+    showResult(result: Blob | Blob[], isCurrent?: () => boolean, missingImages?: number): Promise<boolean>;
     private selectPage;
     showError(preservePreview?: boolean): void;
+    /** 图片无法内嵌时在状态行常驻提示，翻页也保留。 */
+    private applyMissingImagesHint;
     private waitForImage;
     private nextFrame;
     destroy(): void;
