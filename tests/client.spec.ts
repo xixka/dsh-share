@@ -1131,4 +1131,57 @@ describe('分享按钮运行时', () => {
       vi.unstubAllGlobals()
     }
   })
+
+  it('收集不到任何可导出问答时输出一次 DOM 契约失配告警', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fixture = createConversation()
+    const container = document.createElement('div')
+    container.innerHTML = `
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="1"><div><button>复制</button></div></div></div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="2"><div><button>复制</button></div></div></div>`
+    fixture.column.append(...Array.from(container.children))
+    const runtime = createShareRuntime(document, {
+      renderImage: vi.fn(async () => new Blob(['png'], { type: 'image/png' })),
+    })
+    try {
+      triggerShareAction(fixture.column.querySelector('[data-turn-tail="1"]') as HTMLElement, runtime)
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledOnce())
+      expect(String(warn.mock.calls[0])).toContain('no selectable turn content')
+
+      triggerShareAction(fixture.column.querySelector('[data-turn-tail="2"]') as HTMLElement, runtime)
+      await new Promise(resolve => setTimeout(resolve, 50))
+      expect(warn).toHaveBeenCalledOnce()
+    } finally {
+      runtime.dispose()
+      warn.mockRestore()
+    }
+  })
+
+  it('开启 dshShareDebug 后导出时输出过滤明细审计日志', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => `blob:dsh-share-audit-${Math.random()}`),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+    window.localStorage.setItem('dshShareDebug', '1')
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    const fixture = createConversation()
+    const tail = addTurn(fixture, 'audit', 1, true)
+    const runtime = createShareRuntime(document, {
+      renderImage: vi.fn(async () => new Blob(['png'], { type: 'image/png' })),
+    })
+    try {
+      triggerShareAction(tail, runtime)
+      ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
+      await vi.waitFor(() => expect(info).toHaveBeenCalled())
+      const output = info.mock.calls.map(call => call.join(' ')).join('\n')
+      expect(output).toContain('export audit')
+      expect(output).toContain('turn 1 user: 1/1 elements kept')
+      expect(output).toContain('turn 1 assistant:')
+    } finally {
+      runtime.dispose()
+      info.mockRestore()
+    }
+  })
 })

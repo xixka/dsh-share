@@ -276,7 +276,7 @@ describe('分享图渲染', () => {
 })
 
 describe('图片缺失可见化', () => {
-  it('无法内嵌的图片替换为可见占位并计数，data URL 不检查', async () => {
+  it('可获取的图片内联为 data URL，失败的替换为可见占位并计数', async () => {
     const { markUnembeddableImages } = await import('../src/client/preview-dialog.ts')
     const card = document.createElement('article')
     card.innerHTML = `
@@ -285,7 +285,9 @@ describe('图片缺失可见化', () => {
       <img alt="本地截图" src="blob:dsh-media-1">
       <img alt="行内表情" src="data:image/png;base64,AQID">`
     const fetch = vi.fn(async (input: unknown) => {
-      if (String(input).startsWith('blob:')) return { ok: true } as Response
+      if (String(input).startsWith('blob:')) {
+        return { ok: true, blob: async () => new Blob(['local'], { type: 'image/png' }) } as Response
+      }
       throw new TypeError('cors blocked')
     })
     vi.stubGlobal('fetch', fetch)
@@ -297,7 +299,8 @@ describe('图片缺失可见化', () => {
       expect(placeholder?.textContent).toContain('图片无法加载')
       expect(placeholder?.textContent).toContain('数据图表')
       expect(placeholder?.style.backgroundColor).toBe('rgb(243, 244, 246)')
-      expect(card.querySelector('img[alt="本地截图"]')).not.toBeNull()
+      const inlined = card.querySelector<HTMLImageElement>('img[alt="本地截图"]')
+      expect(inlined?.getAttribute('src')).toBe('data:image/png;base64,bG9jYWw=')
       expect(card.querySelector('img[alt="行内表情"]')).not.toBeNull()
     } finally {
       vi.unstubAllGlobals()

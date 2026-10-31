@@ -85,24 +85,29 @@ describe('回答兜底序列', () => {
     return element
   }
 
-  it.each([
-    ['A 0.2.0-rc.2 折叠：answer 标记座位', true, 'true', undefined],
-    ['B 0.2.2-alpha.2：groupPart=response 座位', undefined, undefined, 'response'],
-    ['C 无标记形态：非成员回答座位', true, undefined, undefined],
-  ])('%s 选中回答座位', (_name, member, answer, groupPart) => {
+  /** 已核验 DSH 版本 → 回答座位标记形态矩阵；新增版本只需在此表加一行。 */
+  const VERSION_CONTRACTS = [
+    { version: '0.1.7-rc.2 回答座位带 answer 标记', answer: 'turn-process-answer' as const, membersMarked: false },
+    { version: '0.2.0-rc.2 折叠，回答座位带 answer 标记', answer: 'turn-process-answer' as const, membersMarked: true },
+    { version: '0.2.1-rc.5 折叠，回答座位带 answer 标记', answer: 'turn-process-answer' as const, membersMarked: true },
+    { version: '0.2.2-alpha.2 回答座位带 groupPart=response', answer: 'group-part-response' as const, membersMarked: true },
+    { version: '内部构建无回答标记，依赖成员反选', answer: 'none' as const, membersMarked: true },
+  ]
+
+  it.each(VERSION_CONTRACTS)('$version 时回答座位不被过滤', ({ answer, membersMarked }) => {
     const reasoning = seat('reasoning', 'assistant-step', '', element => {
       element.dataset.chatGroupPart = 'reasoning'
-      if (member) element.dataset.turnProcessMember = 'true'
+      if (membersMarked) element.dataset.turnProcessMember = 'true'
       element.setAttribute('hidden', 'until-found')
       element.innerHTML = '<div data-variant="think">思考</div>'
     })
     const tool = seat('tool', 'tool-call', '', element => {
-      if (member) element.dataset.turnProcessMember = 'true'
+      if (membersMarked) element.dataset.turnProcessMember = 'true'
       element.innerHTML = '<div data-disclosure-row>工具摘要</div>'
     })
     const response = seat('response', 'assistant-step', '最终回答', element => {
-      if (answer === 'true') element.dataset.turnProcessAnswer = 'true'
-      if (groupPart) element.dataset.chatGroupPart = groupPart
+      if (answer === 'turn-process-answer') element.dataset.turnProcessAnswer = 'true'
+      if (answer === 'group-part-response') element.dataset.chatGroupPart = 'response'
     })
 
     const visible = visibleAssistantElements([reasoning, tool, response], true)

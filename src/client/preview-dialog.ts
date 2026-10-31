@@ -25,14 +25,21 @@ const IMAGE_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" preserveA
   + `</svg>`
 const VISIBLE_IMAGE_PLACEHOLDER = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(IMAGE_PLACEHOLDER_SVG)}`
 
-/** 导出前检查卡片里的图片，无法内嵌的替换为可见占位并返回数量，避免在导出图里静默消失。 */
+// 与独立 HTML 导出一致的单图上限；超过时不内联，交给渲染器自行获取。
+const MAX_INLINE_IMAGE_BYTES = 8 * 1024 * 1024
+
+/** 导出前预取卡片图片：成功的转成 data URL 内联（渲染器跳过、不再二次请求），失败项替换为可见占位并计数。 */
 export async function markUnembeddableImages(card: HTMLElement, locale: 'zh' | 'en'): Promise<number> {
   const images = [...card.querySelectorAll<HTMLImageElement>('img')]
     .filter(image => image.getAttribute('src') && !image.getAttribute('src')!.startsWith('data:'))
   const failures: HTMLImageElement[] = []
   await Promise.all(images.map(async image => {
-    if (await canEmbedImage(image.getAttribute('src') ?? '')) return
-    failures.push(image)
+    const { dataUrl, failed } = await prefetchInlineImage(image.getAttribute('src') ?? '')
+    if (failed) {
+      failures.push(image)
+      return
+    }
+    if (dataUrl !== undefined) image.src = dataUrl
   }))
   for (const image of failures) {
     const document = image.ownerDocument
@@ -61,15 +68,31 @@ export async function markUnembeddableImages(card: HTMLElement, locale: 'zh' | '
   return failures.length
 }
 
-async function canEmbedImage(src: string): Promise<boolean> {
-  if (!src || src.startsWith('data:')) return true
+/** 预取图片并转成 data URL；获取失败标记 failed，过大或读取失败时保留原样交给渲染器。 */
+async function prefetchInlineImage(src: string): Promise<{ dataUrl?: string, failed: boolean }> {
+  let blob: Blob
   try {
     const response = await fetch(src)
-    if (!response.ok) return false
-    return true
+    if (!response.ok) return { failed: true }
+    blob = await response.blob()
   } catch {
-    return false
+    return { failed: true }
   }
+  if (blob.size > MAX_INLINE_IMAGE_BYTES) return { failed: false }
+  try {
+    return { dataUrl: await blobToDataUrl(blob), failed: false }
+  } catch {
+    return { failed: false }
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('Could not read image'))
+    reader.readAsDataURL(blob)
+  })
 }
 
 // 保守导出预算，不代表浏览器硬上限；倍率不足以容纳完整内容时明确失败。

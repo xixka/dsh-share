@@ -1,5 +1,5 @@
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import { createShareCard } from './card.ts'
+import { createShareCard, visibleAssistantElements } from './card.ts'
 import {
   selectedTurnsToShareMessages,
   type SelectedTurn,
@@ -103,6 +103,39 @@ function selectableTurns(root: ParentNode): SelectableTurn[] {
   return turns.sort((left, right) => left.turn - right.turn)
 }
 
+/** 一次性诊断：有轮次结尾却收集不到任何可导出问答时提示 DOM 契约失配，方便用户反馈。 */
+function warnIfNoSelectableTurns(root: ParentNode, turns: readonly SelectableTurn[], warned: { done: boolean }): void {
+  if (warned.done || turns.length > 0) return
+  if (root.querySelectorAll('[data-turn-tail]').length === 0) return
+  warned.done = true
+  console.warn(
+    '[dsh-share] Found turn tails but no selectable turn content in this conversation; '
+    + 'the DSH chat DOM may not match this build. Please report the outerHTML of a '
+    + '[data-turn-tail] element if sharing misses content.',
+  )
+}
+
+/** localStorage 里设置 dshShareDebug=1 后，导出时打印每条消息的过滤明细。 */
+function logExportAudit(document: Document, request: RenderRequest, missingImages: number): void {
+  let debug = false
+  try {
+    debug = document.defaultView?.localStorage?.getItem('dshShareDebug') === '1'
+  } catch {
+    debug = false
+  }
+  if (!debug) return
+  const lines = request.content.map((message) => {
+    const visible = message.role === 'assistant'
+      ? visibleAssistantElements(message.elements, request.settings.hideProcess)
+      : message.elements
+    return `  turn ${message.turn} ${message.role}: ${visible.length}/${message.elements.length} elements kept`
+  })
+  console.info(
+    `[dsh-share] export audit: ${request.content.length} messages, ${missingImages} missing images, `
+    + `hideProcess=${request.settings.hideProcess}\n${lines.join('\n')}`,
+  )
+}
+
 const SELECTION_OWNED_SELECTOR = [
   '[data-dsh-share-selection-footer]',
   '[data-dsh-share-select-region]',
@@ -163,6 +196,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
 
   const renderImage = options.renderImage ?? renderShareImage
   const currentLocale = options.getLocale ?? (() => getDocumentLocale(document))
+  const warnedTurnStructure = { done: false }
   let activeContent: readonly ShareMessage[] | undefined
   let activeTitle: string | undefined
   let activeGroupCount = 0
@@ -463,7 +497,9 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   const refreshSelection = (controller: SessionSelection): void => {
     const scroll = controller.scroll
     if (!scroll || !controller.snapshot.active) return
-    for (const turn of selectableTurns(scroll)) {
+    const turns = selectableTurns(scroll)
+    warnIfNoSelectableTurns(scroll, turns, warnedTurnStructure)
+    for (const turn of turns) {
       const isNew = !controller.available.has(turn.id)
       controller.available.set(turn.id, turn)
       if (isNew && controller.selectNewTurns) {
@@ -603,6 +639,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       // PNG 路径与其他格式口径一致：先把 GenUI 静态化，再标记无法内嵌的图片。
       await replaceGenuiWithImages(card.element, request.locale, request.settings)
       const missingImages = await markUnembeddableImages(card.element, request.locale)
+      logExportAudit(document, request, missingImages)
       const blob = await renderImage(card.element)
       if (request.epoch === renderEpoch) {
         await preview.showResult(blob, () => request.epoch === renderEpoch, missingImages)
@@ -711,7 +748,9 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       ?? document.querySelector<HTMLElement>('[data-conversation-scroll]')
     if (!scroll) return
     if (initialTurn !== undefined && directSingleTurnEnabled()) {
-      const selected = selectableTurns(scroll).find(turn => turn.turn === initialTurn)
+      const turns = selectableTurns(scroll)
+      warnIfNoSelectableTurns(scroll, turns, warnedTurnStructure)
+      const selected = turns.find(turn => turn.turn === initialTurn)
       if (!selected) return
       const messages = selectedTurnsToShareMessages([{
         content: snapshotTurnContent(selected.content),

@@ -23,4 +23,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm release:check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lib-${{ github.sha }}
+          path: lib
+          retention-days: 1
+      # 构建产物与已提交 lib/ 的差异摘要；仅提示不阻塞，防止两步提交漏同步。
+      - run: git diff --stat -- lib
       - run: git diff --exit-code
