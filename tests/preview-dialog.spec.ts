@@ -274,3 +274,68 @@ describe('分享图渲染', () => {
     })
   })
 })
+
+describe('图片缺失可见化', () => {
+  it('无法内嵌的图片替换为可见占位并计数，data URL 不检查', async () => {
+    const { markUnembeddableImages } = await import('../src/client/preview-dialog.ts')
+    const card = document.createElement('article')
+    card.innerHTML = `
+      <p>回答正文</p>
+      <img alt="数据图表" src="https://example.com/chart.png">
+      <img alt="本地截图" src="blob:dsh-media-1">
+      <img alt="行内表情" src="data:image/png;base64,AQID">`
+    const fetch = vi.fn(async (input: unknown) => {
+      if (String(input).startsWith('blob:')) return { ok: true } as Response
+      throw new TypeError('cors blocked')
+    })
+    vi.stubGlobal('fetch', fetch)
+    try {
+      const missing = await markUnembeddableImages(card, 'zh')
+      expect(missing).toBe(1)
+      expect(fetch).toHaveBeenCalledTimes(2)
+      const placeholder = card.querySelector<HTMLElement>('[data-dsh-share-image-placeholder]')
+      expect(placeholder?.textContent).toContain('图片无法加载')
+      expect(placeholder?.textContent).toContain('数据图表')
+      expect(placeholder?.style.backgroundColor).toBe('rgb(243, 244, 246)')
+      expect(card.querySelector('img[alt="本地截图"]')).not.toBeNull()
+      expect(card.querySelector('img[alt="行内表情"]')).not.toBeNull()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('缺失计数在状态行常驻提示，翻页保留，新结果清零', async () => {
+    const { PreviewDialog } = await import('../src/client/preview-dialog.ts')
+    let id = 0
+    vi.stubGlobal('URL', { createObjectURL: () => `blob:missing-${++id}`, revokeObjectURL: vi.fn() })
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {} })
+    try {
+      await dialog.showResult([new Blob(['1']), new Blob(['2'])], () => true, 2)
+      const status = dialog.element.querySelector<HTMLElement>('[data-dsh-share-status]')!
+      expect(status.textContent).toBe('2 张图片无法嵌入，已在图片中标记。')
+      dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-next]')!.click()
+      expect(status.textContent).toBe('2 张图片无法嵌入，已在图片中标记。')
+      await dialog.showResult(new Blob(['3']))
+      expect(status.textContent).toBe('')
+    } finally {
+      dialog.destroy()
+      delete (HTMLImageElement.prototype as Partial<HTMLImageElement>).decode
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('html-to-image 兜底占位不再使用透明 gif', async () => {
+    const { renderShareImage } = await import('../src/client/preview-dialog.ts')
+    toBlob.mockResolvedValue(new Blob(['png'], { type: 'image/png' }))
+    const element = document.createElement('article')
+    document.body.append(element)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 768, 200))
+
+    await renderShareImage(element)
+
+    const placeholder = toBlob.mock.calls[0]?.[1]?.imagePlaceholder
+    expect(placeholder).toMatch(/^data:image\/svg\+xml/)
+    expect(placeholder).toContain('Image%20unavailable')
+  })
+})

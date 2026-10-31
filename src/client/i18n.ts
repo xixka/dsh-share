@@ -36,6 +36,7 @@ export interface Translation {
   htmlExporting: string
   htmlExportFailed: string
   htmlMissingImages: string
+  imageMissingImages(count: number): string
   markdownExporting: string
   markdownExportFailed: string
   downloadMarkdownCompact: string
@@ -95,6 +96,7 @@ export function t(locale: ShareLocale): Translation {
       htmlExporting: '正在生成 HTML…',
       htmlExportFailed: 'HTML 生成失败，请重试。',
       htmlMissingImages: '部分图片无法内嵌，已在 HTML 中标记。',
+      imageMissingImages: count => `${count} 张图片无法嵌入，已在图片中标记。`,
       markdownExporting: '正在生成 Markdown…',
       markdownExportFailed: 'Markdown 生成失败，请重试。',
       downloadMarkdownCompact: '下载MD',
@@ -149,6 +151,7 @@ export function t(locale: ShareLocale): Translation {
     htmlExporting: 'Generating HTML…',
     htmlExportFailed: 'Could not generate HTML. Please try again.',
     htmlMissingImages: 'Some images could not be embedded and are marked in the HTML.',
+    imageMissingImages: count => `${count} ${count === 1 ? 'image' : 'images'} could not be embedded and are marked in the PNG.`,
     markdownExporting: 'Generating Markdown…',
     markdownExportFailed: 'Could not generate Markdown. Please try again.',
     downloadMarkdownCompact: 'Markdown',

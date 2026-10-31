@@ -35,6 +35,19 @@ export function snapshotTurnContent(content: TurnContent): TurnContent {
   }
 }
 
+/** 展开过程分组里的消息座位；层级结构变化（部分或全部嵌套）时补齐组内最外层座位，宁多勿缺。 */
+function expandProcessMembers(group: HTMLElement): HTMLElement[] {
+  const direct = [...group.querySelectorAll<HTMLElement>('[data-step-process-content] > [data-chat-flow-kind]')]
+  const outermost = [...group.querySelectorAll<HTMLElement>('[data-chat-flow-kind]')].filter(member => {
+    const ancestor = member.parentElement?.closest('[data-chat-flow-kind]')
+    return ancestor == null || !group.contains(ancestor)
+  })
+  const members = outermost.some(member => !direct.includes(member)) ? outermost : direct
+  return members.filter(member =>
+    member.dataset.chatFlowKind === 'assistant-step' || member.dataset.chatFlowKind === 'tool-call',
+  )
+}
+
 /**
  * 这里集中保存当前 DSH 页面结构的假设，方便上游 DOM 调整后只改一个地方。
  * 从 turn-tail 回溯到本轮开场输入（user 或 steering），并展开过程分组中的消息座位，保留原始顺序。
@@ -53,12 +66,7 @@ export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
     if (kind === 'assistant-step' || kind === 'tool-call') {
       answers.unshift(sibling)
     } else if (sibling.hasAttribute('data-step-process')) {
-      const members = sibling.querySelectorAll<HTMLElement>(
-        '[data-step-process-content] > [data-chat-flow-kind]',
-      )
-      answers.unshift(...[...members].filter(member =>
-        member.dataset.chatFlowKind === 'assistant-step' || member.dataset.chatFlowKind === 'tool-call',
-      ))
+      answers.unshift(...expandProcessMembers(sibling))
     } else if (kind === 'steering') {
       prompts.unshift(sibling)
     } else if (kind === 'user') {

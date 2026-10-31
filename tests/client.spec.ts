@@ -12,6 +12,14 @@ import {
   type ShareConversationActionProps,
   type ShareRuntime,
 } from '../src/client/index.ts'
+import { selectedTurnsToShareMessages } from '../src/client/content.ts'
+import { createShareHtml } from '../src/client/html.ts'
+import { createShareMarkdown } from '../src/client/markdown.ts'
+import { DEFAULT_SHARE_SETTINGS } from '../src/client/settings.ts'
+import { snapshotTurnContent, findTurnContentFromAction } from '../src/client/dom.ts'
+
+const toPng = vi.hoisted(() => vi.fn(async () => 'data:image/png;base64,AQID'))
+vi.mock('html-to-image', () => ({ toPng, toBlob: vi.fn() }))
 
 interface ConversationFixture {
   column: HTMLElement
@@ -1050,5 +1058,77 @@ describe('分享按钮运行时', () => {
 
     runtime.dispose()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-2')
+  })
+
+  it('生成图片走 GenUI 静态化与缺失图片占位，三种导出口径一致', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => `blob:dsh-share-h-${Math.random()}`),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+
+    const fixture = createConversation()
+    const container = document.createElement('div')
+    container.innerHTML = `
+      <div data-chat-flow-kind="user"><div data-time-hover-root><p>问题 全量</p><div><button>复制</button></div></div></div>
+      <div data-step-process data-chat-group-key="p" hidden="until-found"><div data-step-process-body hidden="until-found"><div data-step-process-content data-chat-flow>
+        <div data-chat-flow-kind="assistant-step" data-chat-group-part="reasoning" data-turn-process-member="true" hidden="until-found"><div data-variant="think">思考过程</div></div>
+        <div data-chat-flow-kind="tool-call" data-turn-process-member="true" hidden="until-found"><div data-disclosure-row><span>Bash</span><span>pnpm test</span></div></div>
+      </div></div></div>
+      <div data-chat-flow-kind="assistant-step" data-chat-group-part="response"><article><p>最终回答 全量</p></article><div data-genui><canvas></canvas></div><img alt="远程图表" src="https://example.com/chart.png"></div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="1"><div><button>复制</button><button>分支</button></div></div></div>`
+    fixture.column.append(...Array.from(container.children))
+    const tail = fixture.column.querySelector('[data-turn-tail="1"]') as HTMLElement
+
+    const captured: HTMLElement[] = []
+    const renderImage = vi.fn(async (element: HTMLElement) => {
+      captured.push(element)
+      return new Blob(['png'], { type: 'image/png' })
+    })
+    const fetch = vi.fn(async () => {
+      throw new TypeError('cors blocked')
+    })
+    vi.stubGlobal('fetch', fetch)
+    const runtime = createShareRuntime(document, { renderImage })
+    try {
+      triggerShareAction(tail, runtime)
+      ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
+      await vi.waitFor(() => expect(renderImage).toHaveBeenCalledOnce())
+
+      const toggle = document.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
+      toggle.click()
+      await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(2))
+
+      const card = captured[1]!
+      expect(card.textContent).toContain('问题 全量')
+      expect(card.textContent).toContain('最终回答 全量')
+      expect(card.textContent).not.toContain('思考过程')
+      expect(card.textContent).not.toContain('Bash')
+      expect(card.querySelector('canvas')).toBeNull()
+      const genuiImage = card.querySelector<HTMLImageElement>('img[data-dsh-share-genui]')
+      expect(genuiImage?.getAttribute('src')).toBe('data:image/png;base64,AQID')
+      const placeholder = card.querySelector<HTMLElement>('[data-dsh-share-image-placeholder]')
+      expect(placeholder?.textContent).toContain('远程图表')
+      expect(card.querySelector('img[alt="远程图表"]')).toBeNull()
+      expect(document.querySelector<HTMLElement>('[data-dsh-share-status]')?.textContent)
+        .toBe('1 张图片无法嵌入，已在图片中标记。')
+
+      const content = findTurnContentFromAction(tail.querySelector('button') as HTMLElement)
+      const messages = selectedTurnsToShareMessages([{
+        content: snapshotTurnContent(content!),
+        id: 'turn-1',
+        turn: 1,
+      }])
+      const settings = { ...DEFAULT_SHARE_SETTINGS, hideProcess: true }
+      const markdown = await createShareMarkdown(messages, 'zh', settings)
+      const result = await createShareHtml(document, messages, 'zh', settings)
+      expect(markdown).toContain('最终回答 全量')
+      expect(result.html).toContain('最终回答 全量')
+      expect(markdown).not.toContain('思考过程')
+      expect(result.html).not.toContain('思考过程')
+    } finally {
+      runtime.dispose()
+      vi.unstubAllGlobals()
+    }
   })
 })

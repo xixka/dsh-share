@@ -32,8 +32,12 @@ export async function replaceGenuiWithImages(
     width: `${WIDTH_PRESETS[settings.width] - 48}px`,
     zIndex: '-1',
   })
-  host.append(root)
-  document.body.append(host)
+  // 已挂载的分享卡片留在原宿主中直接静态化；离线副本需要临时宿主提供排版宽度。
+  const attached = root.isConnected
+  if (!attached) {
+    host.append(root)
+    document.body.append(host)
+  }
 
   try {
     for (const block of blocks) {
@@ -51,6 +55,6 @@ export async function replaceGenuiWithImages(
       block.replaceWith(image)
     }
   } finally {
-    host.remove()
+    if (!attached) host.remove()
   }
 }

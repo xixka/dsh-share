@@ -13,11 +13,13 @@ import {
 import { getDocumentLocale, t, type ShareLocale } from './i18n.ts'
 import { createShareMarkdown } from './markdown.ts'
 import { createShareHtml } from './html.ts'
+import { replaceGenuiWithImages } from './static-genui.ts'
 import { mountDownloadFormat, type DownloadFormat } from './download-format.ts'
 import {
   PreviewDialog,
   downloadMarkdownFile,
   downloadHtmlFile,
+  markUnembeddableImages,
   renderShareImage,
   type ImageRenderer,
 } from './preview-dialog.ts'
@@ -598,9 +600,12 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     const preview = ensureDialog()
     const card = createShareCard(document, request.content, request.locale, request.settings)
     try {
+      // PNG 路径与其他格式口径一致：先把 GenUI 静态化，再标记无法内嵌的图片。
+      await replaceGenuiWithImages(card.element, request.locale, request.settings)
+      const missingImages = await markUnembeddableImages(card.element, request.locale)
       const blob = await renderImage(card.element)
       if (request.epoch === renderEpoch) {
-        await preview.showResult(blob, () => request.epoch === renderEpoch)
+        await preview.showResult(blob, () => request.epoch === renderEpoch, missingImages)
       }
     } catch (error) {
       if (request.epoch === renderEpoch) {

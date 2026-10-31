@@ -95,10 +95,8 @@ export function cloneShareMessage(
   const clone = source.cloneNode(true) as HTMLElement
   clone.dataset.dshShareMessage = ''
 
-  // 分享副本需要脱离页面的过程折叠状态。
-  if (source.dataset.turnProcessMember === 'true' && clone.getAttribute('hidden') === 'until-found') {
-    clone.removeAttribute('hidden')
-  }
+  // 分享副本需要脱离页面的过程折叠状态；被选中导出的座位一律移除任何形式的 hidden。
+  clone.removeAttribute('hidden')
   clone.removeAttribute('data-turn-process-member')
   clone.removeAttribute('data-turn-process-hidden')
   clone.removeAttribute('data-turn-process-answer')
@@ -140,6 +138,15 @@ export function cloneShareMessage(
   return clone
 }
 
+/** 判断座位里除思考块与行内推理外是否还有可见正文。 */
+function hasVisibleAnswerText(element: HTMLElement): boolean {
+  const copy = element.cloneNode(true) as HTMLElement
+  for (const reasoning of copy.querySelectorAll('[data-turn-process-inline], [data-variant="think"]')) {
+    reasoning.remove()
+  }
+  return normalizeText(copy.textContent) !== ''
+}
+
 /** 与图片和 Markdown 共用的回答过程过滤规则。 */
 export function visibleAssistantElements(
   elements: readonly HTMLElement[],
@@ -161,8 +168,27 @@ export function visibleAssistantElements(
     if (answers.length > 0) return answers
   }
 
-  // 未折叠的视图没有过程成员标记，以最后一个回答座位为准。
-  return assistantSteps.slice(-1)
+  // 没有显式标记时取末尾连续非成员的回答座位段；工具调用等其他座位视为过程边界。
+  const trailing: HTMLElement[] = []
+  for (let index = elements.length - 1; index >= 0; index -= 1) {
+    const element = elements[index]!
+    if (element.dataset.chatFlowKind !== 'assistant-step'
+      || element.dataset.chatGroupPart === 'reasoning'
+      || element.dataset.turnProcessMember === 'true') break
+    trailing.unshift(element)
+  }
+  if (trailing.length > 0) return trailing
+
+  // 座位标记缺失或被全部标成 reasoning 时，无视 groupPart 找最后一个带可见正文的座位。
+  const steps = elements.filter(element => element.dataset.chatFlowKind === 'assistant-step')
+  const lastWithText = [...steps].reverse().find(element => hasVisibleAnswerText(element))
+  if (lastWithText) return [lastWithText]
+
+  // 仍拿不到时保留全部回答座位（宁多勿缺），最后退回工具调用摘要，绝不让回答区为空。
+  if (steps.length > 0) return steps
+  const toolCalls = elements.filter(element => element.dataset.chatFlowKind === 'tool-call')
+  if (toolCalls.length > 0) return toolCalls
+  return [...elements]
 }
 
 export function createShareCard(
@@ -227,7 +253,7 @@ export function createShareCard(
     const visible = message.role === 'assistant'
       ? visibleAssistantElements(message.elements, settings.hideProcess)
       : message.elements
-    // 隐藏过程时，一条回答只保留最后一个 assistant-step，并从中移除 Think；
+    // 隐藏过程时按兜底序列只保留最终回答座位，并从中移除 Think；
     // 工具调用和中间步骤不会进入图片，用户消息不受该开关影响。
     for (const element of visible) {
       messageSection.append(cloneShareMessage(

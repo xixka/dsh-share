@@ -15,8 +15,62 @@ import {
   type WidthPreset,
 } from './settings.ts'
 
-const TRANSPARENT_IMAGE_PLACEHOLDER =
-  'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
+// 图片获取失败时给导出图保留可见占位：浅灰底 + 断图图标，不再用透明像素静默吞掉。
+const IMAGE_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" viewBox="0 0 240 120">`
+  + `<rect width="240" height="120" fill="#f3f4f6"/>`
+  + `<rect x="2" y="2" width="236" height="116" rx="8" fill="none" stroke="#d1d5db" stroke-width="3"/>`
+  + `<rect x="82" y="20" width="76" height="46" rx="5" fill="none" stroke="#9ca3af" stroke-width="5"/>`
+  + `<path d="M88 60 L150 26" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round"/>`
+  + `<text x="120" y="94" fill="#6b7280" font-family="sans-serif" font-size="13" text-anchor="middle">Image unavailable</text>`
+  + `</svg>`
+const VISIBLE_IMAGE_PLACEHOLDER = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(IMAGE_PLACEHOLDER_SVG)}`
+
+/** 导出前检查卡片里的图片，无法内嵌的替换为可见占位并返回数量，避免在导出图里静默消失。 */
+export async function markUnembeddableImages(card: HTMLElement, locale: 'zh' | 'en'): Promise<number> {
+  const images = [...card.querySelectorAll<HTMLImageElement>('img')]
+    .filter(image => image.getAttribute('src') && !image.getAttribute('src')!.startsWith('data:'))
+  const failures: HTMLImageElement[] = []
+  await Promise.all(images.map(async image => {
+    if (await canEmbedImage(image.getAttribute('src') ?? '')) return
+    failures.push(image)
+  }))
+  for (const image of failures) {
+    const document = image.ownerDocument
+    const placeholder = document.createElement('span')
+    placeholder.dataset.dshShareImagePlaceholder = ''
+    const alt = image.getAttribute('alt')?.replace(/\s+/g, ' ').trim() ?? ''
+    const label = locale === 'zh' ? '图片无法加载' : 'Image unavailable'
+    placeholder.textContent = alt ? `${label}: ${alt}` : label
+    Object.assign(placeholder.style, {
+      backgroundColor: '#f3f4f6',
+      border: '1px solid rgba(127, 127, 127, 0.28)',
+      borderRadius: '8px',
+      boxSizing: 'border-box',
+      color: '#6b7280',
+      display: 'inline-block',
+      fontSize: '14px',
+      lineHeight: '20px',
+      margin: '2px 0',
+      maxWidth: '100%',
+      overflow: 'hidden',
+      padding: '10px 12px',
+      wordBreak: 'break-all',
+    })
+    image.replaceWith(placeholder)
+  }
+  return failures.length
+}
+
+async function canEmbedImage(src: string): Promise<boolean> {
+  if (!src || src.startsWith('data:')) return true
+  try {
+    const response = await fetch(src)
+    if (!response.ok) return false
+    return true
+  } catch {
+    return false
+  }
+}
 
 // 保守导出预算，不代表浏览器硬上限；倍率不足以容纳完整内容时明确失败。
 const MAX_IMAGE_SIDE = 32767
@@ -28,7 +82,7 @@ export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>
 export async function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]> {
   const options = {
     backgroundColor: shareExportBackground(element),
-    imagePlaceholder: TRANSPARENT_IMAGE_PLACEHOLDER,
+    imagePlaceholder: VISIBLE_IMAGE_PLACEHOLDER,
     skipFonts: true,
     skipAutoScale: true,
   }
@@ -111,6 +165,7 @@ export class PreviewDialog {
   private pages: Blob[] = []
   private pageUrls: string[] = []
   private pageIndex = 0
+  private missingImages = 0
   private archiveJob?: AbortController
   private readonly pager: HTMLElement
   private readonly previousPage: HTMLButtonElement
@@ -359,7 +414,11 @@ export class PreviewDialog {
   }
 
   /** 先在独立 img 中完成解码，再原位替换当前预览，避免出现空白帧。 */
-  async showResult(result: Blob | Blob[], isCurrent: () => boolean = () => true): Promise<boolean> {
+  async showResult(
+    result: Blob | Blob[],
+    isCurrent: () => boolean = () => true,
+    missingImages = 0,
+  ): Promise<boolean> {
     const pages = Array.isArray(result) ? result : [result]
     if (!pages.length) throw new Error('No image pages')
     const urls: string[] = []
@@ -386,11 +445,12 @@ export class PreviewDialog {
     const previousUrls = this.pageUrls
     this.pages = pages
     this.pageUrls = urls
+    this.missingImages = missingImages
     this.selectPage(0)
     this.image.style.width = `${WIDTH_PRESETS[this.currentSettings.width]}px`
     this.image.hidden = false
     this.message.hidden = true
-    this.status.textContent = ''
+    this.applyMissingImagesHint()
     this.element.ariaBusy = 'false'
     this.copyButton.disabled = false
     this.downloadButton.disabled = false
@@ -408,7 +468,7 @@ export class PreviewDialog {
     this.blob = this.pages[index]
     this.objectUrl = this.pageUrls[index]
     this.image.src = this.objectUrl!
-    this.status.textContent = ''
+    this.applyMissingImagesHint()
     const strings = t(this.options.getLocale())
     this.pager.hidden = this.pages.length <= 1
     this.downloadAllButton.hidden = this.pages.length <= 1
@@ -444,6 +504,13 @@ export class PreviewDialog {
     this.downloadButton.disabled = true
     this.downloadAllButton.disabled = true
     this.open()
+  }
+
+  /** 图片无法内嵌时在状态行常驻提示，翻页也保留。 */
+  private applyMissingImagesHint(): void {
+    this.status.textContent = this.missingImages > 0
+      ? t(this.options.getLocale()).imageMissingImages(this.missingImages)
+      : ''
   }
 
   private waitForImage(image: HTMLImageElement): Promise<void> {
@@ -524,6 +591,7 @@ export class PreviewDialog {
     this.pageUrls.forEach(url => URL.revokeObjectURL(url))
     this.pageUrls = []
     this.pages = []
+    this.missingImages = 0
     this.pager.hidden = true
     this.downloadAllButton.hidden = true
     this.downloadAllButton.disabled = true
