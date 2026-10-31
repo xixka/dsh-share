@@ -1,6 +1,6 @@
 import { type ShareLocale } from './i18n.ts';
 import { type ShareSettings } from './settings.ts';
-/** 导出前检查卡片里的图片，无法内嵌的替换为可见占位并返回数量，避免在导出图里静默消失。 */
+/** 导出前预取卡片图片：成功的转成 data URL 内联（渲染器跳过、不再二次请求），失败项替换为可见占位并计数。 */
 export declare function markUnembeddableImages(card: HTMLElement, locale: 'zh' | 'en'): Promise<number>;
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>;
 export declare function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]>;
