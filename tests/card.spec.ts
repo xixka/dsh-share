@@ -378,4 +378,35 @@ describe('分享图片卡片', () => {
       card.dispose()
     }
   })
+
+  it('行内代码标签盒完整包裹文字，代码块内代码保持块流', () => {
+    const style = document.createElement('style')
+    style.textContent = STYLE_TEXT
+    document.head.append(style)
+    const source = document.createElement('div')
+    source.innerHTML = '<p>包含 <code>pages.json</code> 与 <code>main.js</code> 文件</p>'
+      + '<pre><code>const x = 1</code></pre>'
+    document.body.append(source)
+    const card = createShareCard(document, [{ role: 'assistant', turn: 1, order: 1, omittedBefore: 0, elements: [source] }], 'zh')
+    try {
+      // jsdom 不实现 !important 覆盖内联样式的级联，这里只验证规则本身命中；
+      // 真实浏览器中 !important 会覆盖 DSH 运行时的内联高度/内边距。
+      const chip = card.element.querySelector('p code')!
+      const chipStyle = getComputedStyle(chip)
+      expect(chipStyle.display).toBe('inline-block')
+      expect(chipStyle.height).toBe('auto')
+      expect(chipStyle.whiteSpace).toBe('pre-wrap')
+      expect(chipStyle.maxWidth).toBe('100%')
+      expect(chipStyle.overflowWrap).toBe('break-word')
+      const blockCode = card.element.querySelector('pre code')!
+      const blockStyle = getComputedStyle(blockCode)
+      expect(blockStyle.display).toBe('inline')
+      expect(blockStyle.paddingLeft).toBe('0px')
+      expect(blockStyle.maxWidth).toBe('none')
+    } finally {
+      card.dispose()
+      style.remove()
+      source.remove()
+    }
+  })
 })
