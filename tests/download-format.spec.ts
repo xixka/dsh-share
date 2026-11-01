@@ -17,7 +17,7 @@ it('选择格式不触发下载，更新语言保留选择，禁用及卸载清�
     trigger().click()
     await vi.waitFor(() => expect(element.querySelector('[role="menu"]')).not.toBeNull())
     const options = element.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
-    expect([...options].map(option => option.textContent)).toEqual(['Markdown', 'HTML', 'PDF'])
+    expect([...options].map(option => option.textContent)).toEqual(['Markdown', 'HTML', 'PDF', 'Word'])
     options[1]!.click()
     expect(change).toHaveBeenCalledExactlyOnceWith('html')
     await vi.waitFor(() => expect(trigger().textContent).toBe('HTML'))
