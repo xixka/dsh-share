@@ -1,5 +1,16 @@
+interface PngImage {
+    data: Uint8Array<ArrayBuffer>;
+    width: number;
+    height: number;
+    colorType: number;
+}
+/** 逐块扫描 PNG，抽取 IHDR 元数据和 IDAT 像素流；非 PNG 输入返回 undefined。 */
+export declare function parsePng(blob: ArrayBuffer): (PngImage & {
+    colorType: number;
+}) | undefined;
 /** 把分页 PNG 装配为单文件 PDF；单页同样生成，保证格式选择行为一致。 */
 export declare function createPagesPdf(pages: readonly Blob[], title?: string, now?: Date, signal?: AbortSignal): Promise<Blob>;
 /** 下载装配好的 PDF，命名与 PNG/HTML 导出一致。 */
 export declare function downloadPdfFile(document: Document, blob: Blob, title?: string): void;
+export {};
 //# sourceMappingURL=pdf.d.ts.map
