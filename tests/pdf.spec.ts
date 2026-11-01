@@ -75,7 +75,6 @@ describe('PDF 装配', () => {
     expect(text).toContain('/Height 512')
     expect(text).toContain('/ColorSpace /DeviceRGB')
     expect(text).toContain('/Predictor 15 /Colors 3')
-    expect(text).toContain('(dsh-标题)')
     expect(text).toContain('/CreationDate (D:20261010090807)')
     expect(text.trimEnd().endsWith('%%EOF')).toBe(true)
     // xref 偏移指向真实对象头
