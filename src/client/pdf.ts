@@ -156,6 +156,17 @@ function assemblePdf(pages: readonly PdfPage[], now: Date): Blob {
   return new Blob(chunks, { type: 'application/pdf' })
 }
 
+/** 读取 Blob 字节；Blob.arrayBuffer 缺失时（旧 jsdom）用 FileReader 兜底。 */
+async function readBlobBytes(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === 'function') return blob.arrayBuffer()
+  return await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as ArrayBuffer)
+    reader.onerror = () => reject(new Error('Could not read page bytes'))
+    reader.readAsArrayBuffer(blob)
+  })
+}
+
 /** 把分页 PNG 装配为单文件 PDF；单页同样生成，保证格式选择行为一致。 */
 export async function createPagesPdf(pages: readonly Blob[], title?: string, now = new Date(), signal?: AbortSignal): Promise<Blob> {
   if (!pages.length || pages.length > 10000 || pages.reduce((sum, page) => sum + page.size, 0) > 512 * 1024 * 1024) {
@@ -164,8 +175,7 @@ export async function createPagesPdf(pages: readonly Blob[], title?: string, now
   const pdfPages: PdfPage[] = []
   for (const page of pages) {
     signal?.throwIfAborted()
-    const buffer = await page.arrayBuffer()
-    const image = parsePng(buffer)
+    const image = parsePng(await readBlobBytes(page))
     // 预览页始终是插件自己生成的 PNG；异常输入直接失败而不是产出坏页。
     if (!image) throw new Error('Share page is not a valid PNG')
     pdfPages.push({ image })

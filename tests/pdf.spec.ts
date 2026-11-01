@@ -45,6 +45,15 @@ const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
   return value >>> 0
 })
 
+async function readBlobBytes(blob: Blob): Promise<Uint8Array> {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer))
+    reader.onerror = () => reject(new Error('Could not read pdf bytes'))
+    reader.readAsArrayBuffer(blob)
+  })
+}
+
 function parsePdf(data: Uint8Array): { text: string; offsets: Map<number, number> } {
   const text = Buffer.from(data).toString('latin1')
   const offsets = new Map<number, number>()
@@ -57,7 +66,7 @@ function parsePdf(data: Uint8Array): { text: string; offsets: Map<number, number
 describe('PDF 装配', () => {
   it('单页 PNG 装配为单页 PDF，页面尺寸等于像素尺寸', async () => {
     const blob = await createPagesPdf([makePng(768, 512, 2)], '标题', new Date(2026, 9, 10, 9, 8, 7))
-    const bytes = new Uint8Array(await blob.arrayBuffer())
+    const bytes = await readBlobBytes(blob)
     const { text, offsets } = parsePdf(bytes)
     expect(text.startsWith('%PDF-1.4')).toBe(true)
     expect(text).toContain('/Count 1')
@@ -80,7 +89,7 @@ describe('PDF 装配', () => {
   it('多页 PNG 装配顺序与页码一致，页对象互相独立', async () => {
     const pages = [makePng(100, 80, 2), makePng(120, 90, 2), makePng(140, 100, 2)]
     const blob = await createPagesPdf(pages)
-    const { text } = parsePdf(new Uint8Array(await blob.arrayBuffer()))
+    const { text } = parsePdf(await readBlobBytes(blob))
     expect(text).toContain('/Count 3')
     expect(text.match(/\/MediaBox \[0 0 \d+ \d+\]/g)).toHaveLength(3)
     expect(text).toContain('/MediaBox [0 0 100 80]')
@@ -90,16 +99,16 @@ describe('PDF 装配', () => {
 
   it('带 Alpha 的 PNG 走 RGBA 通道和显式 Decode', async () => {
     const blob = await createPagesPdf([makePng(64, 48, 6)])
-    const { text } = parsePdf(new Uint8Array(await blob.arrayBuffer()))
+    const { text } = parsePdf(await readBlobBytes(blob))
     expect(text).toContain('/Predictor 15 /Colors 4')
     expect(text).toContain('/Decode [0 1 0 1 0 1 0 1]')
   })
 
   it('灰度与灰度+Alpha 的 PNG 映射 DeviceGray', async () => {
-    const gray = parsePdf(new Uint8Array(await (await createPagesPdf([makePng(32, 32, 0)])).arrayBuffer())).text
+    const gray = parsePdf(await readBlobBytes(await createPagesPdf([makePng(32, 32, 0)]))).text
     expect(gray).toContain('/ColorSpace /DeviceGray')
     expect(gray).toContain('/Colors 1')
-    const grayAlpha = parsePdf(new Uint8Array(await (await createPagesPdf([makePng(32, 32, 4)])).arrayBuffer())).text
+    const grayAlpha = parsePdf(await readBlobBytes(await createPagesPdf([makePng(32, 32, 4)]))).text
     expect(grayAlpha).toContain('/ColorSpace /DeviceGray')
     expect(grayAlpha).toContain('/Decode [0 1 0 1]')
   })
