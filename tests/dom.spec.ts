@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest'
-import { findTurnContent, findTurnContentFromAction } from '../src/client/dom.ts'
+import { findTurnContent, findTurnContentFromAction, snapshotTurnContent } from '../src/client/dom.ts'
 import { visibleAssistantElements, cloneShareMessage } from '../src/client/card.ts'
 
 function renderFixture(): HTMLElement {
@@ -220,5 +220,49 @@ describe('回答兜底序列', () => {
     const visible = visibleAssistantElements([reasoning, genui], true)
     expect(visible.map(item => item.id)).toEqual(['genui'])
     expect(visible[0]!.querySelector('[data-genui]')).not.toBeNull()
+  })
+
+  it('追问插在回答中间时按 DOM 顺序切分问答段', () => {
+    document.body.innerHTML = `
+      <div data-chat-flow-kind="user" id="user">开场问题</div>
+      <div data-chat-flow-kind="assistant-step" id="answer-1">第一段回答</div>
+      <div data-chat-flow-kind="steering" id="steering">追问</div>
+      <div data-chat-flow-kind="assistant-step" id="answer-2">第二段回答</div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="1"><button>分享</button></div></div>`
+
+    const content = findTurnContent(document.querySelector('[data-turn-tail]') as HTMLElement)
+    expect(content?.prompts.map(item => item.id)).toEqual(['user', 'steering'])
+    expect(content?.answers.map(item => item.id)).toEqual(['answer-1', 'answer-2'])
+    expect(content?.segments.map(segment => ({
+      prompts: segment.prompts.map(item => item.id),
+      answers: segment.answers.map(item => item.id),
+    }))).toEqual([
+      { prompts: ['user'], answers: ['answer-1'] },
+      { prompts: ['steering'], answers: ['answer-2'] },
+    ])
+
+    const snapshot = snapshotTurnContent(content!)
+    expect(snapshot.segments.map(segment => ({
+      prompts: segment.prompts.map(item => item.id),
+      answers: segment.answers.map(item => item.id),
+    }))).toEqual([
+      { prompts: ['user'], answers: ['answer-1'] },
+      { prompts: ['steering'], answers: ['answer-2'] },
+    ])
+    expect(snapshot.segments[0]!.prompts[0]).not.toBe(content!.prompts[0])
+  })
+
+  it('连续追问合并进同一段用户消息', () => {
+    document.body.innerHTML = `
+      <div data-chat-flow-kind="user" id="user">开场问题</div>
+      <div data-chat-flow-kind="steering" id="steering-1">追问一</div>
+      <div data-chat-flow-kind="steering" id="steering-2">追问二</div>
+      <div data-chat-flow-kind="assistant-step" id="answer">合并回答</div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="1"><button>分享</button></div></div>`
+
+    const content = findTurnContent(document.querySelector('[data-turn-tail]') as HTMLElement)
+    expect(content?.segments).toHaveLength(1)
+    expect(content?.segments[0]?.prompts.map(item => item.id)).toEqual(['user', 'steering-1', 'steering-2'])
+    expect(content?.segments[0]?.answers.map(item => item.id)).toEqual(['answer'])
   })
 })

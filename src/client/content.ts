@@ -33,22 +33,32 @@ export function selectedTurnsToShareMessages(selected: Iterable<SelectedTurn>): 
   })
 }
 
-/** 一轮问答转成连续的“用户消息 + 回答消息”渲染模型。 */
+/** 一轮问答按真实时序切成连续的「用户消息 + 回答消息」段；steering 追问紧跟其后的回答。 */
 export function turnToShareMessages(content: TurnContent, turn: number): ShareMessage[] {
-  return [
-    {
-      elements: content.prompts,
-      omittedBefore: 0,
-      order: turn * 2,
-      role: 'user',
-      turn,
-    },
-    {
-      elements: content.answers,
-      omittedBefore: 0,
-      order: turn * 2 + 1,
-      role: 'assistant',
-      turn,
-    },
-  ]
+  const segments = content.segments.length > 0
+    ? content.segments
+    : [{ prompts: content.prompts, answers: content.answers }]
+  const messages: ShareMessage[] = []
+  let order = turn * 2
+  for (const segment of segments) {
+    if (segment.prompts.length > 0) {
+      messages.push({
+        elements: segment.prompts,
+        omittedBefore: 0,
+        order: order++,
+        role: 'user',
+        turn,
+      })
+    }
+    if (segment.answers.length > 0) {
+      messages.push({
+        elements: segment.answers,
+        omittedBefore: 0,
+        order: order++,
+        role: 'assistant',
+        turn,
+      })
+    }
+  }
+  return messages
 }

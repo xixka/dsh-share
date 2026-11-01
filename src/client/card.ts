@@ -215,10 +215,12 @@ export function createShareCard(
     color: 'var(--dsw-alias-label-primary, #111827)',
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
-    overflowWrap: 'anywhere',
+    // break-word 只在长串放不下整行时才折断；anywhere 会把最小内容宽度压到单字符，
+    // 弹性布局里短词（如 miniProgram）也会被拦腰折断。
+    overflowWrap: 'break-word',
     padding: '28px 24px 24px',
     width: `${WIDTH_PRESETS[settings.width]}px`,
-    wordBreak: 'break-word',
+    wordBreak: 'normal',
   })
 
   for (const [index, message] of messages.entries()) {

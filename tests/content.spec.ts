@@ -14,7 +14,12 @@ function selected(turn: number): SelectedTurn {
   const answer = document.createElement('div')
   answer.textContent = `回答 ${turn}`
   return {
-    content: { prompts: [prompt], answers: [answer], tail: document.createElement('div') },
+    content: {
+      prompts: [prompt],
+      answers: [answer],
+      segments: [{ prompts: [prompt], answers: [answer] }],
+      tail: document.createElement('div'),
+    },
     id: String(turn),
     turn,
   }
@@ -41,6 +46,7 @@ describe('问答组多选排序', () => {
     const content: TurnContent = {
       prompts: [prompt],
       answers: [answer],
+      segments: [{ prompts: [prompt], answers: [answer] }],
       tail: document.createElement('div'),
     }
 
@@ -49,6 +55,50 @@ describe('问答组多选排序', () => {
       { role: 'user', turn: 7, order: 14, omittedBefore: 0 },
       { role: 'assistant', turn: 7, order: 15, omittedBefore: 0 },
     ])
+    expect(messages[0]?.elements).toEqual([prompt])
+    expect(messages[1]?.elements).toEqual([answer])
+  })
+
+  it('追问插在回答中间时按 DOM 顺序输出分段问答', () => {
+    const user = document.createElement('div')
+    const firstAnswer = document.createElement('div')
+    const steering = document.createElement('div')
+    const toolCall = document.createElement('div')
+    const finalAnswer = document.createElement('div')
+    const content: TurnContent = {
+      prompts: [user, steering],
+      answers: [firstAnswer, toolCall, finalAnswer],
+      segments: [
+        { prompts: [user], answers: [firstAnswer] },
+        { prompts: [steering], answers: [toolCall, finalAnswer] },
+      ],
+      tail: document.createElement('div'),
+    }
+
+    const messages = turnToShareMessages(content, 1)
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant', 'user', 'assistant'])
+    expect(messages.map(message => message.elements)).toEqual([
+      [user],
+      [firstAnswer],
+      [steering],
+      [toolCall, finalAnswer],
+    ])
+    expect(messages.every(message => message.turn === 1)).toBe(true)
+    expect(messages.map(message => message.order)).toEqual([2, 3, 4, 5])
+  })
+
+  it('没有分段信息时回退为整轮合并输出', () => {
+    const prompt = document.createElement('div')
+    const answer = document.createElement('div')
+    const content = {
+      prompts: [prompt],
+      answers: [answer],
+      segments: [],
+      tail: document.createElement('div'),
+    } as TurnContent
+
+    const messages = turnToShareMessages(content, 2)
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant'])
     expect(messages[0]?.elements).toEqual([prompt])
     expect(messages[1]?.elements).toEqual([answer])
   })

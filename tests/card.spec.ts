@@ -363,4 +363,19 @@ describe('分享图片卡片', () => {
     expect(dark.element.style.backgroundColor).toBe(SHARE_DARK_BACKGROUND)
     dark.dispose()
   })
+
+  it('卡片换行策略不拦截腰折断短词，长串仅在放不下整行时折断', () => {
+    const prompt = document.createElement('div')
+    prompt.textContent = '问题'
+    const answer = document.createElement('div')
+    answer.textContent = '回答'
+
+    const card = createShareCard(document, pair(prompt, [answer]), 'zh')
+    try {
+      expect(card.element.style.overflowWrap).toBe('break-word')
+      expect(card.element.style.wordBreak).toBe('normal')
+    } finally {
+      card.dispose()
+    }
+  })
 })
