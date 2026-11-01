@@ -13,9 +13,15 @@ function message(html: string, role: 'user' | 'assistant' = 'assistant', turn = 
   return { elements: [element], role, turn, order: turn * 2, omittedBefore: 0 }
 }
 
-/** 解包 Store ZIP；返回 文件名 -> latin1 文本 与原始字节。 */
+/** 解包 Store ZIP；返回 文件名 -> 文本 与原始字节。 */
 async function unpack(blob: Blob): Promise<Map<string, { text: string; bytes: Uint8Array }>> {
-  const bytes = new Uint8Array(await blob.arrayBuffer())
+  const raw = await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as ArrayBuffer)
+    reader.onerror = () => reject(new Error('Could not read docx bytes'))
+    reader.readAsArrayBuffer(blob)
+  })
+  const bytes = new Uint8Array(raw)
   const view = new DataView(bytes.buffer)
   const files = new Map<string, { text: string; bytes: Uint8Array }>()
   let offset = 0
