@@ -141,14 +141,16 @@ describe('独立 HTML 导出', () => {
 
   it('非人类触发器卡片映射为带边框的静态摘要块', async () => {
     const entry = message(`
-      <div data-chat-flow-kind="turn-trigger"><section data-turn-trigger>
+      <section data-turn-trigger>
         <button class="oz9t_a_header" aria-expanded="false">
           <span class="oz9t_a_icon"><svg data-icon></svg></span>
           <span class="oz9t_a_title">后台任务状态更新</span>
           <time class="oz9t_a_time" datetime="2026-10-31T12:03:00Z">10月31日 20:03</time>
         </button>
         <div class="oz9t_a_body"><p>background job finished</p></div>
-      </section></div>`, 'user')
+      </section>`, 'user')
+    // 真实 DOM 里消息座位本身就带 data-chat-flow-kind；与 cloneShareMessage 的分支条件对齐。
+    entry.elements[0]!.dataset.chatFlowKind = 'turn-trigger'
     const result = await createShareHtml(document, [entry], 'zh', DEFAULT_SHARE_SETTINGS)
     const parsed = new DOMParser().parseFromString(result.html, 'text/html')
 
