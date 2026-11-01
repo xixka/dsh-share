@@ -103,6 +103,42 @@ function cloneToolCallSummary(
   return clone
 }
 
+/**
+ * 非人类触发器卡片（后台任务、定时、agent 唤醒等）整卡保留：
+ * 折叠头按钮转为静态行（标题、时间和图标在按钮内，直接删按钮会丢标题），
+ * 展开状态交由当前 DOM 决定——未展开只出摘要行，与工具卡片口径一致。
+ */
+function cloneTurnTrigger(source: HTMLElement): HTMLElement {
+  const clone = source.cloneNode(true) as HTMLElement
+  clone.dataset.dshShareMessage = ''
+  const header = clone.querySelector<HTMLElement>('[data-turn-trigger] > button')
+  if (header) {
+    const replacement = clone.ownerDocument.createElement('div')
+    for (const attribute of header.attributes) {
+      if (attribute.name === 'class' || attribute.name === 'style' || attribute.name.startsWith('data-')) {
+        replacement.setAttribute(attribute.name, attribute.value)
+      }
+    }
+    replacement.append(...header.childNodes)
+    header.replaceWith(replacement)
+  }
+  for (const control of clone.querySelectorAll('button, input, textarea, select, [role="tooltip"]')) {
+    control.remove()
+  }
+  for (const element of [clone, ...clone.querySelectorAll<HTMLElement>('*')]) {
+    element.removeAttribute('aria-expanded')
+    element.removeAttribute('aria-controls')
+    element.removeAttribute('id')
+  }
+  applyStyles(clone, {
+    boxSizing: 'border-box',
+    margin: '0',
+    maxWidth: 'none',
+    width: '100%',
+  })
+  return clone
+}
+
 export function cloneShareMessage(
   source: HTMLElement,
   locale: 'zh' | 'en',
@@ -110,6 +146,9 @@ export function cloneShareMessage(
 ): HTMLElement {
   if (source.dataset.chatFlowKind === 'tool-call') {
     return cloneToolCallSummary(source, locale)
+  }
+  if (source.dataset.chatFlowKind === 'turn-trigger') {
+    return cloneTurnTrigger(source)
   }
 
   const clone = source.cloneNode(true) as HTMLElement

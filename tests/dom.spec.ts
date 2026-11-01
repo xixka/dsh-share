@@ -64,6 +64,20 @@ describe('DSH 对话 DOM 适配', () => {
     expect(content?.answers.map((item) => item.id)).toEqual(['answer'])
   })
 
+  it('回溯收集以非人类触发器开场、没有 user/steering 座位的轮次', () => {
+    document.body.innerHTML = `
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="old"><div><button></button></div></div></div>
+      <div data-chat-flow-kind="turn-trigger" id="trigger"><section data-turn-trigger><button class="header"><span class="icon"><svg></svg></span><span class="title">后台任务状态更新</span><time>10月31日 20:03</time></button><div class="body"><p>background job finished</p></div></section></div>
+      <div data-chat-flow-kind="assistant-step" id="answer"><div>回答</div></div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="current"><div class="actions"><button></button></div></div></div>`
+    const tail = document.querySelector('[data-turn-tail="current"]') as HTMLElement
+
+    const content = findTurnContent(tail)
+
+    expect(content?.prompts.map((item) => item.id)).toEqual(['trigger'])
+    expect(content?.answers.map((item) => item.id)).toEqual(['answer'])
+  })
+
   it('从官方操作插槽中的按钮找到当前轮内容', () => {
     const tail = renderFixture()
     const action = document.createElement('button')

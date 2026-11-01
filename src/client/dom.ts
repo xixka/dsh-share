@@ -91,6 +91,12 @@ export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
     } else if (kind === 'steering') {
       prompts.unshift(sibling)
       seats.unshift({ prompt: true, element: sibling })
+    } else if (kind === 'turn-trigger') {
+      // 后台任务、定时、agent 唤醒等非人类触发器渲染成 turn-trigger 卡片，
+      // 这类轮次没有 user/steering 座位；trigger 即本轮开场，作为提问座位保留。
+      prompts.unshift(sibling)
+      seats.unshift({ prompt: true, element: sibling })
+      break
     } else if (kind === 'user') {
       prompts.unshift(sibling)
       seats.unshift({ prompt: true, element: sibling })

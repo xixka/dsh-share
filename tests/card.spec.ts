@@ -432,4 +432,37 @@ describe('分享图片卡片', () => {
       card.dispose()
     }
   })
+
+  it('非人类触发器卡片转为静态块，保留标题、时间和展开内容', () => {
+    const trigger = document.createElement('div')
+    trigger.dataset.chatFlowKind = 'turn-trigger'
+    trigger.innerHTML = `
+      <section data-turn-trigger>
+        <button class="header" aria-expanded="false" aria-controls="trigger-body">
+          <span class="icon"><svg data-icon></svg></span>
+          <span class="title">后台任务状态更新</span>
+          <time datetime="2026-10-31T12:03:00Z">10月31日 20:03</time>
+        </button>
+        <div class="body" id="trigger-body"><p>background job finished [status: completed]</p></div>
+      </section>`
+    const answer = document.createElement('div')
+    answer.textContent = '最终回答'
+
+    const card = createShareCard(document, pair(trigger, [answer]), 'zh')
+    try {
+      const cardTrigger = card.element.querySelector('[data-turn-trigger]')!
+      expect(cardTrigger).not.toBeNull()
+      expect(card.element.querySelector('button')).toBeNull()
+      const header = cardTrigger.querySelector('.header') as HTMLElement
+      expect(header?.tagName).toBe('DIV')
+      expect(header?.textContent).toContain('后台任务状态更新')
+      expect(header?.textContent).toContain('10月31日 20:03')
+      expect(header?.querySelector('svg')).not.toBeNull()
+      expect(header?.hasAttribute('aria-expanded')).toBe(false)
+      expect(cardTrigger.querySelector('.body')?.textContent).toContain('background job finished')
+      expect(cardTrigger.querySelector('.body')?.hasAttribute('id')).toBe(false)
+    } finally {
+      card.dispose()
+    }
+  })
 })
