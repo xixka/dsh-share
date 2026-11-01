@@ -131,7 +131,11 @@ function collectBlocks(source: Node, blocks: WordBlock[], inheritedQuote = false
       }
       case 'svg': case 'button': case 'canvas': break
       case 'p': case 'div': {
-        // 触发器卡片等容器：标题行加粗、正文弱化色，仍保持可编辑文本。
+        // 容器内包含代码块等块级子元素时递归展开；否则作为普通段落归并。
+        if (element.querySelector('pre, table, blockquote, ul, ol, h1, h2, h3, h4, h5, h6')) {
+          collectBlocks(element, blocks, inheritedQuote)
+          break
+        }
         const runs = collectRuns(element)
         const text = runs.map(run => run.text).join('').trim()
         if (text) blocks.push({ kind: 'paragraph', runs })
