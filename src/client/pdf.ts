@@ -87,8 +87,8 @@ function assemblePdf(pages: readonly PdfPage[], now: Date): Blob {
   const chunks: Uint8Array<ArrayBuffer>[] = []
   let offset = 0
   const offsets: number[] = []
-  const push = (part: Uint8Array<ArrayBuffer>): void => {
-    chunks.push(part)
+  const push = (part: Uint8Array): void => {
+    chunks.push(part as Uint8Array<ArrayBuffer>)
     offset += part.length
   }
   const beginObject = (id: number): void => {
