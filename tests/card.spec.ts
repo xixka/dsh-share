@@ -379,7 +379,7 @@ describe('分享图片卡片', () => {
     }
   })
 
-  it('行内代码芯片排版交给宿主，只解除烧录的固定高度', () => {
+  it('行内代码芯片在测量期强制 inline 盒，避免烧录固定 px 宽高', () => {
     const style = document.createElement('style')
     style.textContent = STYLE_TEXT
     document.head.append(style)
@@ -389,15 +389,18 @@ describe('分享图片卡片', () => {
     document.body.append(source)
     const card = createShareCard(document, [{ role: 'assistant', turn: 1, order: 1, omittedBefore: 0, elements: [source] }], 'zh')
     try {
-      // 插件不再接管芯片的 display/padding/white-space；宿主规则与烧录的内联样式决定外观。
-      // 只强制 height:auto，抵消 html-to-image 烧录的固定 px 高度。
+      // inline 元素的计算宽度保持 auto；inline-flex/inline-block 会被 html-to-image
+      // 烧成固定 px 宽，foreignObject 里回退字体更宽时文件名会被截断换行。
       const chip = card.element.querySelector('p code')!
       const chipStyle = getComputedStyle(chip)
+      expect(chipStyle.display).toBe('inline')
       expect(chipStyle.height).toBe('auto')
-      expect(chipStyle.display).not.toBe('inline-block')
+      expect(chipStyle.width).toBe('auto')
       const blockCode = card.element.querySelector('pre code')!
       const blockStyle = getComputedStyle(blockCode)
+      expect(blockStyle.display).toBe('inline')
       expect(blockStyle.height).toBe('auto')
+      expect(blockStyle.width).toBe('auto')
     } finally {
       card.dispose()
       style.remove()

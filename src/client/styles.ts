@@ -490,16 +490,20 @@ div:has([data-dsh-share-button]) > span { order: 2; }
   font-size: calc(var(--dsh-share-font-size) * .875) !important;
 }
 /*
- * 行内代码芯片排版交给宿主样式（卡片与宿主同文档，宿主规则本来就命中克隆）。
- * html-to-image 会把测量期的计算样式烧录成克隆的内联样式，foreignObject 里插件规则不再参与排版，
- * 所以这里只做两件事：解除烧录的固定高度，禁止烧录期把芯片宽度钳到容器造成的截断。
+ * 行内代码芯片在测量期强制 inline 盒：inline 元素的计算宽度保持 auto，
+ * html-to-image 烧录进克隆后芯片随内容自适应。inline-flex/inline-block 会被烧成固定 px 宽，
+ * 而 foreignObject 里页面字体不可用（回退字体更宽），固定宽度会把文件名截断换行。
  */
 [data-dsh-share-card] [data-dsh-share-message] :where(code) {
+  display: inline !important;
   height: auto !important;
+  width: auto !important;
 }
-/* 代码块内的 code 维持块流排版。 */
-[data-dsh-share-card] [data-dsh-share-message] :where(pre) :where(code) {
+/* 文件名芯片的静态 span 同理：跟随内容宽度，不烧录固定 px。 */
+[data-dsh-share-card] [data-dsh-share-message] :where(code) > :where(span) {
+  display: inline !important;
   height: auto !important;
+  width: auto !important;
 }
 [data-dsh-share-card] [data-dsh-share-message] :where(pre) {
   max-width: 100% !important;
