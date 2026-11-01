@@ -5,7 +5,6 @@ export interface Translation {
     selectedTitle(count: number): string;
     share: string;
     shareTooltip: string;
-    shareConversation: string;
     cancelSelection: string;
     createSelection: string;
     createSelectionCompact: string;
