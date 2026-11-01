@@ -5,7 +5,7 @@ import { applyHtmlExportTheme } from './export-theme.ts'
 import { HTML_STYLE } from './html-style.ts'
 import { replaceGenuiWithImages } from './static-genui.ts'
 
-const TAGS = new Set('div p span br hr h1 h2 h3 h4 h5 h6 strong b em i u s del blockquote pre code ul ol li table thead tbody tfoot tr th td caption a sub sup details summary'.split(' '))
+const TAGS = new Set('div p span br hr h1 h2 h3 h4 h5 h6 strong b em i u s del blockquote pre code ul ol li table thead tbody tfoot tr th td caption a sub sup details summary section time'.split(' '))
 const DROP = new Set('script style link meta base iframe object embed form input button textarea select template svg canvas audio video source'.split(' '))
 const IMAGE_TYPE = /^image\/(png|jpeg|gif|webp|avif)$/i
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
