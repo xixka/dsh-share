@@ -1174,11 +1174,12 @@ describe('分享按钮运行时', () => {
     try {
       triggerShareAction(tail, runtime)
       ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
-      await vi.waitFor(() => expect(info).toHaveBeenCalled())
-      const output = info.mock.calls.map(call => call.join(' ')).join('\n')
-      expect(output).toContain('export audit')
+      const collected = () => info.mock.calls.map(call => call.join(' ')).join('\n')
+      await vi.waitFor(() => expect(collected()).toContain('export audit'))
+      const output = collected()
       expect(output).toContain('turn 1 user: 1/1 elements kept')
       expect(output).toContain('turn 1 assistant:')
+      expect(output).toContain('discovered turns: 1/1 tail(s) -> [1]')
     } finally {
       runtime.dispose()
       info.mockRestore()

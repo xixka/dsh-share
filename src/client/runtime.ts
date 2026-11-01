@@ -115,15 +115,18 @@ function warnIfNoSelectableTurns(root: ParentNode, turns: readonly SelectableTur
   )
 }
 
+/** localStorage 里设置 dshShareDebug=1 后，导出与轮次发现都会打印诊断明细。 */
+function readShareDebugFlag(document: Document): boolean {
+  try {
+    return document.defaultView?.localStorage?.getItem('dshShareDebug') === '1'
+  } catch {
+    return false
+  }
+}
+
 /** localStorage 里设置 dshShareDebug=1 后，导出时打印每条消息的过滤明细。 */
 function logExportAudit(document: Document, request: RenderRequest, missingImages: number): void {
-  let debug = false
-  try {
-    debug = document.defaultView?.localStorage?.getItem('dshShareDebug') === '1'
-  } catch {
-    debug = false
-  }
-  if (!debug) return
+  if (!readShareDebugFlag(document)) return
   const lines = request.content.map((message) => {
     const visible = message.role === 'assistant'
       ? visibleAssistantElements(message.elements, request.settings.hideProcess)
@@ -133,6 +136,18 @@ function logExportAudit(document: Document, request: RenderRequest, missingImage
   console.info(
     `[dsh-share] export audit: ${request.content.length} messages, ${missingImages} missing images, `
     + `hideProcess=${request.settings.hideProcess}\n${lines.join('\n')}`,
+  )
+}
+
+/** dshShareDebug 开启时打印当前可导出轮次；轮次集合变化才输出，避免滚动扫描刷屏。 */
+function logDiscoveredTurns(document: Document, scroll: ParentNode, turns: readonly SelectableTurn[], lastSignature: { value: string }): void {
+  if (!readShareDebugFlag(document)) return
+  const signature = turns.map(turn => turn.turn).join(',')
+  if (signature === lastSignature.value) return
+  lastSignature.value = signature
+  const tails = scroll.querySelectorAll('[data-turn-tail]').length
+  console.info(
+    `[dsh-share] discovered turns: ${turns.length}/${tails} tail(s) -> [${signature || 'none'}]`,
   )
 }
 
@@ -197,6 +212,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   const renderImage = options.renderImage ?? renderShareImage
   const currentLocale = options.getLocale ?? (() => getDocumentLocale(document))
   const warnedTurnStructure = { done: false }
+  const lastDebugTurns = { value: '' }
   let activeContent: readonly ShareMessage[] | undefined
   let activeTitle: string | undefined
   let activeGroupCount = 0
@@ -499,6 +515,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     if (!scroll || !controller.snapshot.active) return
     const turns = selectableTurns(scroll)
     warnIfNoSelectableTurns(scroll, turns, warnedTurnStructure)
+    logDiscoveredTurns(document, scroll, turns, lastDebugTurns)
     for (const turn of turns) {
       const isNew = !controller.available.has(turn.id)
       controller.available.set(turn.id, turn)
@@ -751,7 +768,15 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       const turns = selectableTurns(scroll)
       warnIfNoSelectableTurns(scroll, turns, warnedTurnStructure)
       const selected = turns.find(turn => turn.turn === initialTurn)
-      if (!selected) return
+      if (!selected) {
+        if (readShareDebugFlag(document)) {
+          console.warn(
+            `[dsh-share] turn ${initialTurn} is not selectable; discovered turns: `
+            + `[${turns.map(turn => turn.turn).join(',') || 'none'}]`,
+          )
+        }
+        return
+      }
       const messages = selectedTurnsToShareMessages([{
         content: snapshotTurnContent(selected.content),
         id: selected.id,
