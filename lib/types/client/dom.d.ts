@@ -1,8 +1,14 @@
 export declare const TURN_TAIL_SELECTOR = "[data-turn-tail]";
 export declare const TURN_FLOW_SELECTOR = "[data-chat-flow-kind=\"turn-tail\"]";
+export interface TurnSegment {
+    prompts: HTMLElement[];
+    answers: HTMLElement[];
+}
 export interface TurnContent {
     prompts: HTMLElement[];
     answers: HTMLElement[];
+    /** 按 DOM 顺序切分的问答段；steering 追问插在回答中间时保留真实时序。 */
+    segments: TurnSegment[];
     tail: HTMLElement;
 }
 export interface RenderedTurn {

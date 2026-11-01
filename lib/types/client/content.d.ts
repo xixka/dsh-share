@@ -18,6 +18,6 @@ export interface SelectedTurn {
 }
 /** 始终按会话顺序输出；一轮问答拆成连续的用户与回答消息供渲染器使用。 */
 export declare function selectedTurnsToShareMessages(selected: Iterable<SelectedTurn>): ShareMessage[];
-/** 一轮问答转成连续的“用户消息 + 回答消息”渲染模型。 */
+/** 一轮问答按真实时序切成连续的「用户消息 + 回答消息」段；steering 追问紧跟其后的回答。 */
 export declare function turnToShareMessages(content: TurnContent, turn: number): ShareMessage[];
 //# sourceMappingURL=content.d.ts.map
