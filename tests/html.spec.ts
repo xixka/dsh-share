@@ -139,6 +139,28 @@ describe('独立 HTML 导出', () => {
     expect(document.querySelector('[data-dsh-share-genui-host]')).toBeNull()
   })
 
+  it('非人类触发器卡片映射为带边框的静态摘要块', async () => {
+    const entry = message(`
+      <div data-chat-flow-kind="turn-trigger"><section data-turn-trigger>
+        <button class="oz9t_a_header" aria-expanded="false">
+          <span class="oz9t_a_icon"><svg data-icon></svg></span>
+          <span class="oz9t_a_title">后台任务状态更新</span>
+          <time class="oz9t_a_time" datetime="2026-10-31T12:03:00Z">10月31日 20:03</time>
+        </button>
+        <div class="oz9t_a_body"><p>background job finished</p></div>
+      </section></div>`, 'user')
+    const result = await createShareHtml(document, [entry], 'zh', DEFAULT_SHARE_SETTINGS)
+    const parsed = new DOMParser().parseFromString(result.html, 'text/html')
+
+    expect(parsed.querySelector('.turn-trigger')).not.toBeNull()
+    expect(parsed.querySelector('.trigger-header')?.tagName).toBe('DIV')
+    expect(parsed.querySelector('.trigger-header')?.textContent).toContain('后台任务状态更新')
+    expect(parsed.querySelector('.trigger-time')?.textContent).toBe('10月31日 20:03')
+    expect(parsed.querySelector('.trigger-body')?.textContent).toContain('background job finished')
+    expect(parsed.querySelector('button,svg')).toBeNull()
+    expect(HTML_STYLE).toContain('.turn-trigger')
+  })
+
   it('遵守隐藏过程设置，并在异步读取前固定内容', async () => {
     const entry = message('<div data-variant="think">推理</div><p>最终回答</p>', 'assistant')
     entry.elements[0]!.dataset.chatFlowKind = 'assistant-step'

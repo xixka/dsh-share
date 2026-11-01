@@ -129,9 +129,19 @@ export async function createShareHtml(
     const result = TAGS.has(tag) ? output.createElement(tag) : output.createDocumentFragment()
     if (result.nodeType === 1) {
       const element = result as HTMLElement
+      const trigger = source.closest('[data-turn-trigger]')
       if (source.hasAttribute('data-code-block-banner')) element.className = 'code-banner'
       else if (source.classList.contains('md-code-block')) element.className = 'code-block'
       else if (source.getAttribute('data-variant') === 'think') element.className = 'reasoning'
+      else if (trigger === source) element.className = 'turn-trigger'
+      else if (trigger) {
+        // 官方 hashed 类名含 header/title/time/body/explanation 片段，按片段映射触发器内部结构。
+        if (/(^|_)(header)/.test(source.className)) element.className = 'trigger-header'
+        else if (/(^|_)(title)/.test(source.className)) element.className = 'trigger-title'
+        else if (/(^|_)(time)/.test(source.className)) element.className = 'trigger-time'
+        else if (/(^|_)(explanation)/.test(source.className)) element.className = 'trigger-explanation'
+        else if (/(^|_)(body)/.test(source.className)) element.className = 'trigger-body'
+      }
       if (tag === 'span' && source.closest('pre')) {
         const color = (source as HTMLElement).style.color
         if (/^(?:#[\da-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]+)$/i.test(color)) element.style.color = color
