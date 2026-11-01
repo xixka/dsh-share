@@ -93,7 +93,7 @@ describe('分享图渲染', () => {
   it.each(['zh', 'en'] as const)('生成失败时以%s文案说明替代导出方式', async locale => {
     const { PreviewDialog } = await import('../src/client/preview-dialog.ts')
     const { t } = await import('../src/client/i18n.ts')
-    const dialog = new PreviewDialog(document, { getLocale: () => locale, onSettingsChange() {}, onDismiss() {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => locale, onSettingsChange() {}, onDismiss() {}, renderPdf: async () => new Blob() })
     try {
       dialog.showError()
       expect(dialog.element.querySelector('[data-dsh-share-message]')!.textContent).toBe(t(locale).renderFailed)
@@ -121,7 +121,7 @@ describe('分享图渲染', () => {
       downloadUrls.push(this.href)
     })
     let locale: 'zh' | 'en' = 'zh'
-    const dialog = new PreviewDialog(document, { getLocale: () => locale, getConversationTitle: () => '对话.png示例', onSettingsChange() {}, onDismiss() {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => locale, getConversationTitle: () => '对话.png示例', onSettingsChange() {}, onDismiss() {}, renderPdf: async () => new Blob() })
     try {
       const downloadAll = dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download-all]')!
       expect(downloadAll.hidden).toBe(true)
@@ -192,7 +192,7 @@ describe('分享图渲染', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     vi.stubGlobal('URL', { createObjectURL: () => 'blob:page', revokeObjectURL: vi.fn() })
     Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => {} })
-    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {}, renderPdf: async () => new Blob() })
     try {
       await dialog.showResult([new Blob(['1']), new Blob(['2'])])
       dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download-all]')!.click()
@@ -217,7 +217,7 @@ describe('分享图渲染', () => {
     const revoke = vi.fn()
     vi.stubGlobal('URL', { createObjectURL: () => 'blob:zip-test', revokeObjectURL: revoke })
     Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => {} })
-    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {}, renderPdf: async () => new Blob() })
     try {
       await dialog.showResult([new Blob(['1']), new Blob(['2'])])
       const button = dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download-all]')!
@@ -312,7 +312,7 @@ describe('图片缺失可见化', () => {
     let id = 0
     vi.stubGlobal('URL', { createObjectURL: () => `blob:missing-${++id}`, revokeObjectURL: vi.fn() })
     Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => {} })
-    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {}, renderPdf: async () => new Blob() })
     try {
       await dialog.showResult([new Blob(['1']), new Blob(['2'])], () => true, 2)
       const status = dialog.element.querySelector<HTMLElement>('[data-dsh-share-status]')!

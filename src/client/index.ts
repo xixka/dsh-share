@@ -100,7 +100,7 @@ export function apply(ctx: Context): void {
 export { createShareCard } from './card.ts'
 export { createShareMarkdown } from './markdown.ts'
 export { findTurnContent, findTurnContentFromAction } from './dom.ts'
-export { renderShareImage, type ImageRenderer } from './preview-dialog.ts'
+export { renderShareImage, renderSharePdf, type ImageRenderer } from './preview-dialog.ts'
 export {
   createShareRuntime,
   type InstallOptions,

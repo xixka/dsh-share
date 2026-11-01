@@ -13,6 +13,7 @@ import {
 import { getDocumentLocale, t, type ShareLocale } from './i18n.ts'
 import { createShareMarkdown } from './markdown.ts'
 import { createShareHtml } from './html.ts'
+import { createPagesPdf, downloadPdfFile } from './pdf.ts'
 import { replaceGenuiWithImages } from './static-genui.ts'
 import { mountDownloadFormat, type DownloadFormat } from './download-format.ts'
 import {
@@ -21,6 +22,7 @@ import {
   downloadHtmlFile,
   markUnembeddableImages,
   renderShareImage,
+  renderSharePdf,
   type ImageRenderer,
 } from './preview-dialog.ts'
 import { loadDirectSingleTurn, type ShareSettings } from './settings.ts'
@@ -600,12 +602,21 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       download.dataset.busy = 'true'
       download.disabled = true
       controller.downloadFormat?.update(locale, true)
-      htmlStatus.textContent = format === 'markdown' ? t(locale).markdownExporting : t(locale).htmlExporting
+      htmlStatus.textContent = format === 'markdown'
+        ? t(locale).markdownExporting
+        : format === 'pdf' ? t(locale).pdfExporting : t(locale).htmlExporting
       try {
         if (format === 'markdown') {
           const markdown = await createShareMarkdown(messages, locale, ensureDialog().settings)
           if (!footer.isConnected) return
           downloadMarkdownFile(document, markdown, title)
+          htmlStatus.textContent = ''
+        } else if (format === 'pdf') {
+          // PDF 与弹窗里的图片同一渲染产物：先走同一张渲染管线拿到分页 PNG，再原样装配。
+          const dialog = ensureDialog()
+          const result = await dialog.renderPagesForPdf(messages, locale)
+          if (!footer.isConnected) return
+          downloadPdfFile(document, result, title)
           htmlStatus.textContent = ''
         } else {
           const result = await createShareHtml(document, messages, locale, ensureDialog().settings)
@@ -617,7 +628,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
         if (footer.isConnected) {
           htmlStatus.textContent = format === 'markdown'
             ? t(currentLocale()).markdownExportFailed
-            : t(currentLocale()).htmlExportFailed
+            : format === 'pdf' ? t(currentLocale()).pdfExportFailed : t(currentLocale()).htmlExportFailed
         }
       } finally {
         delete download.dataset.busy
@@ -738,6 +749,18 @@ export function createShareRuntime(document: Document, options: InstallOptions =
         activeContent = undefined
         activeGroupCount = 0
         invalidateRenderQueue()
+      },
+      // PDF 与预览图同一管线：构建卡片 → GenUI 静态化 → 渲染分页 PNG → 装配 PDF。
+      // 不触碰 renderEpoch，避免打断用户正在进行的预览渲染。
+      renderPdf: async (content, locale) => {
+        const card = createShareCard(document, content as readonly ShareMessage[], locale, dialog!.settings)
+        try {
+          await replaceGenuiWithImages(card.element, locale, dialog!.settings)
+          await markUnembeddableImages(card.element, locale)
+          return await renderSharePdf(card.element, activeTitle)
+        } finally {
+          card.dispose()
+        }
       },
     })
     return dialog

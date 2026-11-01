@@ -30,10 +30,13 @@ export interface Translation {
   download: string
   downloadMarkdown: string
   downloadHtml: string
+  downloadPdf: string
   downloadFile: string
   downloadFormat: string
   htmlExporting: string
   htmlExportFailed: string
+  pdfExporting: string
+  pdfExportFailed: string
   htmlMissingImages: string
   imageMissingImages(count: number): string
   markdownExporting: string
@@ -89,10 +92,13 @@ export function t(locale: ShareLocale): Translation {
       download: '下载图片',
       downloadMarkdown: '下载 Markdown',
       downloadHtml: '下载 HTML',
+      downloadPdf: '下载 PDF',
       downloadFile: '下载',
       downloadFormat: '下载格式',
       htmlExporting: '正在生成 HTML…',
       htmlExportFailed: 'HTML 生成失败，请重试。',
+      pdfExporting: '正在生成 PDF…',
+      pdfExportFailed: 'PDF 生成失败，请重试。',
       htmlMissingImages: '部分图片无法内嵌，已在 HTML 中标记。',
       imageMissingImages: count => `${count} 张图片无法嵌入，已在图片中标记。`,
       markdownExporting: '正在生成 Markdown…',
@@ -143,10 +149,13 @@ export function t(locale: ShareLocale): Translation {
     download: 'Download image',
     downloadMarkdown: 'Download Markdown',
     downloadHtml: 'Download HTML',
+    downloadPdf: 'Download PDF',
     downloadFile: 'Download',
     downloadFormat: 'Download format',
     htmlExporting: 'Generating HTML…',
     htmlExportFailed: 'Could not generate HTML. Please try again.',
+    pdfExporting: 'Generating PDF…',
+    pdfExportFailed: 'Could not generate PDF. Please try again.',
     htmlMissingImages: 'Some images could not be embedded and are marked in the HTML.',
     imageMissingImages: count => `${count} ${count === 1 ? 'image' : 'images'} could not be embedded and are marked in the PNG.`,
     markdownExporting: 'Generating Markdown…',
