@@ -109,6 +109,7 @@ describe('PDF 装配', () => {
     expect(gray).toContain('/Colors 1')
     const grayAlpha = parsePdf(await readBlobBytes(await createPagesPdf([makePng(32, 32, 4)]))).text
     expect(grayAlpha).toContain('/ColorSpace /DeviceGray')
+    expect(grayAlpha).toContain('/Colors 2')
     expect(grayAlpha).toContain('/Decode [0 1 0 1]')
   })
 
