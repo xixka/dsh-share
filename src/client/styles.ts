@@ -474,17 +474,18 @@ div:has([data-dsh-share-button]) > span { order: 2; }
   font-size: 14px !important;
   line-height: 24px !important;
 }
+/* 标题倍率对齐宿主 markdown 字号体系（h1 21/14=1.5、h2 19/14≈1.36、h3 18/14≈1.29），行高按宿主 30/28/26px 等比。 */
 [data-dsh-share-card] [data-dsh-share-message] :where(h1) {
-  font-size: calc(var(--dsh-share-font-size) * 1.55) !important;
-  line-height: 1.3 !important;
+  font-size: calc(var(--dsh-share-font-size) * 1.5) !important;
+  line-height: calc(var(--dsh-share-font-size) * 1.57) !important;
 }
 [data-dsh-share-card] [data-dsh-share-message] :where(h2) {
-  font-size: calc(var(--dsh-share-font-size) * 1.28) !important;
-  line-height: 1.35 !important;
+  font-size: calc(var(--dsh-share-font-size) * 1.36) !important;
+  line-height: calc(var(--dsh-share-font-size) * 1.47) !important;
 }
 [data-dsh-share-card] [data-dsh-share-message] :where(h3, h4, h5, h6) {
-  font-size: calc(var(--dsh-share-font-size) * 1.12) !important;
-  line-height: 1.4 !important;
+  font-size: calc(var(--dsh-share-font-size) * 1.29) !important;
+  line-height: calc(var(--dsh-share-font-size) * 1.43) !important;
 }
 [data-dsh-share-card] [data-dsh-share-message] :where(pre, code, code *) {
   font-size: calc(var(--dsh-share-font-size) * .875) !important;
