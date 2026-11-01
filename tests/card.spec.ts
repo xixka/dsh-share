@@ -379,7 +379,7 @@ describe('分享图片卡片', () => {
     }
   })
 
-  it('行内代码标签盒完整包裹文字，代码块内代码保持块流', () => {
+  it('行内代码芯片排版交给宿主，只解除烧录的固定高度', () => {
     const style = document.createElement('style')
     style.textContent = STYLE_TEXT
     document.head.append(style)
@@ -389,20 +389,15 @@ describe('分享图片卡片', () => {
     document.body.append(source)
     const card = createShareCard(document, [{ role: 'assistant', turn: 1, order: 1, omittedBefore: 0, elements: [source] }], 'zh')
     try {
-      // jsdom 不实现 !important 覆盖内联样式的级联，这里只验证规则本身命中；
-      // 真实浏览器中 !important 会覆盖 DSH 运行时的内联高度/内边距。
+      // 插件不再接管芯片的 display/padding/white-space；宿主规则与烧录的内联样式决定外观。
+      // 只强制 height:auto，抵消 html-to-image 烧录的固定 px 高度。
       const chip = card.element.querySelector('p code')!
       const chipStyle = getComputedStyle(chip)
-      expect(chipStyle.display).toBe('inline-block')
       expect(chipStyle.height).toBe('auto')
-      expect(chipStyle.whiteSpace).toBe('pre-wrap')
-      expect(chipStyle.maxWidth).toBe('100%')
-      expect(chipStyle.overflowWrap).toBe('break-word')
+      expect(chipStyle.display).not.toBe('inline-block')
       const blockCode = card.element.querySelector('pre code')!
       const blockStyle = getComputedStyle(blockCode)
-      expect(blockStyle.display).toBe('inline')
-      expect(blockStyle.paddingLeft).toBe('0px')
-      expect(blockStyle.maxWidth).toBe('none')
+      expect(blockStyle.height).toBe('auto')
     } finally {
       card.dispose()
       style.remove()
