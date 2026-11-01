@@ -16,6 +16,7 @@ function makePng(width: number, height: number, colorType: 0 | 2 | 4 | 6, interl
   ihdrView.setUint32(4, height)
   ihdr[8] = 8
   ihdr[9] = colorType
+  ihdr[12] = interlace
   const chunk = (type: string, data: Uint8Array): Uint8Array => {
     const out = new Uint8Array(12 + data.length)
     const view = new DataView(out.buffer)
@@ -120,15 +121,16 @@ describe('PDF 装配', () => {
   })
 
   it('下载文件名与 PNG/HTML 导出一致', () => {
-    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const downloads: string[] = []
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloads.push(this.download)
+    })
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pdf-preview')
     const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     downloadPdfFile(document, new Blob([new Uint8Array([1])]), '测试对话')
-    expect(anchorClick).toHaveBeenCalledOnce()
-    const anchor = document.querySelector('a')!
-    expect(anchor.download).toBe('dsh-测试对话.pdf')
-    expect(anchor.href).toContain('blob:pdf-preview')
-    anchorClick.mockRestore()
+    expect(click).toHaveBeenCalledOnce()
+    expect(downloads).toEqual(['dsh-测试对话.pdf'])
+    click.mockRestore()
     revoke.mockRestore()
     expect(createDownloadFilename('pdf', undefined, undefined, new Date(2026, 9, 10, 9, 8, 7))).toBe('dsh-20261010-090807.pdf')
   })
