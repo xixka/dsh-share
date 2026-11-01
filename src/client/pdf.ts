@@ -11,7 +11,7 @@ const PNG_TYPE = new Uint8Array([0x49, 0x44, 0x41, 0x54])
 const PNG_SIGNATURE = 0x89504e47
 
 interface PngImage {
-  data: Uint8Array
+  data: Uint8Array<ArrayBuffer>
   width: number
   height: number
   colorType: number
@@ -21,7 +21,7 @@ interface PdfPage {
   image: PngImage
 }
 
-function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
+function concatBytes(parts: readonly Uint8Array<ArrayBuffer>[]): Uint8Array<ArrayBuffer> {
   const total = parts.reduce((sum, part) => sum + part.length, 0)
   const out = new Uint8Array(total)
   let offset = 0
@@ -40,7 +40,7 @@ function asciiBytes(text: string): Uint8Array {
 
 /** 逐块扫描 PNG，抽取 IHDR 元数据和 IDAT 像素流；非 PNG 输入返回 undefined。 */
 function parsePng(blob: ArrayBuffer): (PngImage & { colorType: number }) | undefined {
-  const bytes = new Uint8Array(blob)
+  const bytes = new Uint8Array(blob) as Uint8Array<ArrayBuffer>
   const view = new DataView(blob)
   if (bytes.length < 33 || view.getUint32(0) !== PNG_SIGNATURE) return undefined
   if (view.getUint32(12) !== 0x49484452) return undefined // IHDR
@@ -52,7 +52,7 @@ function parsePng(blob: ArrayBuffer): (PngImage & { colorType: number }) | undef
   // 隔行 PNG 的扫描线布局与 Predictor 期望不同；canvas.toBlob 不会产出隔行图，遇到即拒绝。
   if (interlace !== 0) return undefined
   if (!pngColorSpace(colorType)) return undefined
-  const idat: Uint8Array[] = []
+  const idat: Uint8Array<ArrayBuffer>[] = []
   let offset = 8
   while (offset + 12 <= bytes.length) {
     const length = view.getUint32(offset)
@@ -84,7 +84,7 @@ function pngColorSpace(colorType: number): string | undefined {
 function assemblePdf(pages: readonly PdfPage[], now: Date): Blob {
   const pad = (value: number): string => String(value).padStart(2, '0')
   const created = `D:${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
-  const chunks: Uint8Array[] = []
+  const chunks: Uint8Array<ArrayBuffer>[] = []
   let offset = 0
   const offsets: number[] = []
   const push = (part: Uint8Array): void => {
