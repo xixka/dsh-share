@@ -45,6 +45,26 @@ function makeToolSummaryStatic(row: HTMLElement): void {
 }
 
 /**
+ * DSH 会把解析到真实文件的行内代码渲染成 <code><button>图标 文件名</button></code> 芯片，
+ * 通用按钮清理会把文件名一并删掉。这里先把这些芯片转成静态 span，仅保留 class、
+ * 内联样式、data-* 属性、图标和文件名文本；点击行为与宿主样式不进入导出结果。
+ */
+function makeInlineFileMentionsStatic(root: HTMLElement): void {
+  const document = root.ownerDocument
+  for (const button of [...root.querySelectorAll<HTMLButtonElement>('code > button')]) {
+    if (!button.querySelector('svg') && !normalizeText(button.textContent)) continue
+    const replacement = document.createElement('span')
+    for (const attribute of button.attributes) {
+      if (attribute.name === 'class' || attribute.name === 'style' || attribute.name.startsWith('data-')) {
+        replacement.setAttribute(attribute.name, attribute.value)
+      }
+    }
+    replacement.append(...button.childNodes)
+    button.replaceWith(replacement)
+  }
+}
+
+/**
  * 工具卡片内部可能包含展开面板和终端输出；这里只克隆原生折叠摘要行。
  * 摘要的运行时 class、图标和内容结构会被保留，不依赖写死的 CSS Module 类名。
  */
@@ -120,6 +140,8 @@ export function cloneShareMessage(
     const last = hoverRoot.lastElementChild
     if (last?.querySelector('button')) last.remove()
   }
+  // 行内代码里的文件芯片先静态化，否则下一步按钮清理会连文件名一起删除。
+  makeInlineFileMentionsStatic(clone)
   for (const element of clone.querySelectorAll<HTMLElement>(
     'button, input, textarea, select, [data-dsh-share-button], [role="tooltip"]',
   )) {

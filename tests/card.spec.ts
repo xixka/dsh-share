@@ -409,4 +409,29 @@ describe('分享图片卡片', () => {
       source.remove()
     }
   })
+
+  it('行内代码文件芯片转静态 span，保留图标和文件名', () => {
+    const prompt = document.createElement('div')
+    prompt.textContent = '问题'
+    const answer = document.createElement('div')
+    // 模拟 DSH 对可打开文件名的渲染：<code><button class=fileMention><svg/>文件名</button></code>
+    answer.innerHTML = '<p>宽 chips 加载条件在 <code><button type="button" class="fileMention" title="E:\\greenGo\\index.html" aria-label="打开 index.html"><svg data-icon></svg>index.html</button></code> 与 <code><button type="button" class="fileMention"><svg data-icon></svg>login-jump.js</button></code> 中</p>'
+      + '<p>普通代码 <code>const x = 1</code> 不受影响</p>'
+
+    const card = createShareCard(document, pair(prompt, [answer]), 'zh')
+    try {
+      expect(card.element.querySelector('button')).toBeNull()
+      const chips = card.element.querySelectorAll('p code span')
+      expect(chips).toHaveLength(2)
+      expect(chips[0]!.className).toBe('fileMention')
+      expect(chips[0]!.getAttribute('title')).toBe('E:\\greenGo\\index.html')
+      expect(chips[0]!.hasAttribute('aria-label')).toBe(false)
+      expect(chips[0]!.querySelector('svg')).not.toBeNull()
+      expect(chips[0]!.textContent).toBe('index.html')
+      expect(chips[1]!.textContent).toBe('login-jump.js')
+      expect(card.element.querySelector('p:last-child code')?.textContent).toBe('const x = 1')
+    } finally {
+      card.dispose()
+    }
+  })
 })
