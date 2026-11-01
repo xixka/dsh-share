@@ -9,7 +9,6 @@ export interface Translation {
   selectedTitle(count: number): string
   share: string
   shareTooltip: string
-  shareConversation: string
   cancelSelection: string
   createSelection: string
   createSelectionCompact: string
@@ -69,7 +68,6 @@ export function t(locale: ShareLocale): Translation {
       selectedTitle: () => '生成图片',
       share: '将当前问答分享为图片',
       shareTooltip: '分享',
-      shareConversation: '分享对话',
       cancelSelection: '取消',
       createSelection: '生成分享图片',
       createSelectionCompact: '生成图片',
@@ -124,7 +122,6 @@ export function t(locale: ShareLocale): Translation {
     selectedTitle: () => 'Generate image',
     share: 'Share this Q&A as an image',
     shareTooltip: 'Share',
-    shareConversation: 'Share conversation',
     cancelSelection: 'Cancel',
     createSelection: 'Create image',
     createSelectionCompact: 'Create image',

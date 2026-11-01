@@ -14,8 +14,7 @@ DSH 对话分享插件，分享单轮或多轮对话，可导出为图片或 Mar
 
 ## 功能
 
-- 从右上角进入问答选择模式，默认全选
-- 每轮的分享按钮也会进入选择模式，并只预选当前问答
+- 每轮的分享按钮进入问答选择模式，只预选当前问答，其余问答默认全选
 - 问题和回答两侧都有联动勾选框，也可直接点击内容整组选择，支持不连续选择
 - 勾选框会在长内容滚动时吸附在页面上，到当前问题或回答末尾再移出
 - 可复制图片、下载 PNG 或 Markdown
@@ -76,7 +75,7 @@ corepack pnpm verify
 
 ## 兼容性
 
-开发基线为 `@deepseek-ai/dsh 0.2.0-rc.2`，运行时依赖范围为 `^0.1.7-rc.2 || ^0.2.0-rc.2`。分享入口使用官方 `conversation.chat.assistant-actions` 和 `conversation.session.header.utilities` 插槽，不扫描或修改按钮栏 DOM。多选模式通过 `data-chat-flow-kind` 等稳定的 `data-*` 属性添加选择框，不依赖 CSS Module 生成的类名；DSH 调整对话结构后可能需要同步适配。
+开发基线为 `@deepseek-ai/dsh 0.2.0-rc.2`，运行时依赖范围为 `^0.1.7-rc.2 || ^0.2.0-rc.2`。分享入口使用官方 `conversation.chat.assistant-actions` 插槽，不扫描或修改按钮栏 DOM。多选模式通过 `data-chat-flow-kind` 等稳定的 `data-*` 属性添加选择框，不依赖 CSS Module 生成的类名；DSH 调整对话结构后可能需要同步适配。
 
 ## 已知限制
 

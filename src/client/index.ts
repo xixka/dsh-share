@@ -6,8 +6,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import { IconShareOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { createElement, Fragment, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { createElement, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react'
 import { normalizeShareLocale, t } from './i18n.ts'
 import {
   createShareRuntime,
@@ -28,10 +28,6 @@ interface ShareRuntimeInjected {
 
 export type ShareActionProps =
   PropsRuntime<'conversation.chat.assistant-actions'>
-  & InjectFace<ShareRuntimeInjected>
-
-export type ShareConversationActionProps =
-  PropsRuntime<'conversation.session.header.utilities'>
   & InjectFace<ShareRuntimeInjected>
 
 /** 官方 assistant-actions 插槽中的分享入口。 */
@@ -57,26 +53,6 @@ export function ShareAction({
     createElement(IconShareOutlineRegular, { size: 16 }),
   )
   return createElement(Tooltip, { label: strings.shareTooltip, side: 'bottom', children: button })
-}
-
-/** 官方 Session Header 右侧 utilities 插槽中的多轮分享入口。 */
-export function ShareConversationAction({
-  sessionId, shareRuntime, useShareLocale, useShareSelection, useSessions,
-}: ShareConversationActionProps): ReactElement {
-  const conversationTitle = useSessions(snapshot => snapshot.byId[sessionId]?.title)
-  const strings = t(normalizeShareLocale(useShareLocale(snapshot => snapshot.active)))
-  const selectionActive = useShareSelection(snapshot => snapshot.active)
-  if (selectionActive) return createElement(Fragment)
-  const button = createElement('button', {
-      type: 'button',
-      'data-dsh-share-conversation': '',
-      'aria-label': strings.shareConversation,
-      onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
-        if (event.detail > 0) event.currentTarget.blur()
-        shareRuntime.enterSelection(String(sessionId), event.currentTarget, undefined, conversationTitle)
-      },
-    }, createElement(IconShareOutlineRegular, { size: 16 }))
-  return createElement(Tooltip, { label: strings.shareConversation, side: 'bottom', children: button })
 }
 
 export function apply(ctx: Context): void {
@@ -117,15 +93,6 @@ export function apply(ctx: Context): void {
       order: 20,
       inject: injectFace,
     }, ShareAction)
-    return cleanup(disposeRegistration)
-  })
-  ctx.slots.inject('conversation.session.header.utilities', () => {
-    const disposeRegistration = ctx.slots.register({
-      name: 'conversation.session.header.utilities',
-      id: 'share-conversation',
-      order: -10,
-      inject: injectFace,
-    }, ShareConversationAction)
     return cleanup(disposeRegistration)
   })
 }

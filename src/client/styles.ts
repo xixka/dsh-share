@@ -47,21 +47,6 @@ div:has([data-dsh-share-button]) > span { order: 2; }
   opacity: 1;
 }
 [data-dsh-share-button]:disabled { cursor: wait; opacity: .38; }
-[data-dsh-share-conversation] {
-  align-items: center;
-  appearance: none;
-  background: transparent;
-  border: 0;
-  border-radius: var(--dsw-radius-sm, 6px);
-  color: var(--dsw-alias-label-primary, currentColor);
-  cursor: pointer;
-  display: inline-flex;
-  height: 34px;
-  justify-content: center;
-  padding: 0;
-  width: 34px;
-}
-[data-dsh-share-conversation]:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, .12)); }
 
 /* DeepSeek 官网式选择模式：一轮问答作为一组，常规操作和输入区让位给底栏。 */
 [data-conversation-scroll][data-dsh-share-selection] [data-composer-seat],
