@@ -14,6 +14,7 @@ import { getDocumentLocale, t, type ShareLocale } from './i18n.ts'
 import { createShareMarkdown } from './markdown.ts'
 import { createShareHtml } from './html.ts'
 import { createPagesPdf, downloadPdfFile } from './pdf.ts'
+import { createShareDocx, downloadDocxFile } from './docx.ts'
 import { replaceGenuiWithImages } from './static-genui.ts'
 import { mountDownloadFormat, type DownloadFormat } from './download-format.ts'
 import {
@@ -602,9 +603,10 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       download.dataset.busy = 'true'
       download.disabled = true
       controller.downloadFormat?.update(locale, true)
-      htmlStatus.textContent = format === 'markdown'
-        ? t(locale).markdownExporting
-        : format === 'pdf' ? t(locale).pdfExporting : t(locale).htmlExporting
+      htmlStatus.textContent = format === 'markdown' ? t(locale).markdownExporting
+        : format === 'pdf' ? t(locale).pdfExporting
+        : format === 'docx' ? t(locale).docxExporting
+        : t(locale).htmlExporting
       try {
         if (format === 'markdown') {
           const markdown = await createShareMarkdown(messages, locale, ensureDialog().settings)
@@ -618,6 +620,11 @@ export function createShareRuntime(document: Document, options: InstallOptions =
           if (!footer.isConnected) return
           downloadPdfFile(document, result, title)
           htmlStatus.textContent = ''
+        } else if (format === 'docx') {
+          const blob = await createShareDocx(document, messages, locale, ensureDialog().settings)
+          if (!footer.isConnected) return
+          downloadDocxFile(document, blob, title)
+          htmlStatus.textContent = ''
         } else {
           const result = await createShareHtml(document, messages, locale, ensureDialog().settings)
           if (!footer.isConnected) return
@@ -626,9 +633,10 @@ export function createShareRuntime(document: Document, options: InstallOptions =
         }
       } catch {
         if (footer.isConnected) {
-          htmlStatus.textContent = format === 'markdown'
-            ? t(currentLocale()).markdownExportFailed
-            : format === 'pdf' ? t(currentLocale()).pdfExportFailed : t(currentLocale()).htmlExportFailed
+          htmlStatus.textContent = format === 'markdown' ? t(currentLocale()).markdownExportFailed
+            : format === 'pdf' ? t(currentLocale()).pdfExportFailed
+            : format === 'docx' ? t(currentLocale()).docxExportFailed
+            : t(currentLocale()).htmlExportFailed
         }
       } finally {
         delete download.dataset.busy
