@@ -219,7 +219,8 @@ describe('分享按钮运行时', () => {
 
     for (const dispose of injectionDisposers) dispose()
     expect(disposeRegistration).toHaveBeenCalledOnce()
-    expect(disposeLocale).toHaveBeenCalledOnce()
+    // 单入口不再触发 Header 场景的 locale 订阅。
+    expect(disposeLocale).not.toHaveBeenCalled()
     expect(document.querySelector('[data-dsh-share-dialog]')).toBeNull()
     expect(document.getElementById('dsh-share-style')).toBeNull()
   })
@@ -321,7 +322,7 @@ describe('分享按钮运行时', () => {
     runtime.dispose()
   })
 
-  it('进入官网式选择模式后默认全选，每轮问题和回答各放一个联动选择框', () => {
+  it('消息入口进入选择模式只预选当前问答，可一键全选并展示联动选择框', () => {
     const fixture = createConversation()
     const tail = addTurn(fixture, 'first', 1)
     addTurn(fixture, 'second', 2)
@@ -332,15 +333,16 @@ describe('分享按钮运行时', () => {
 
     expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
       active: true,
-      allSelected: true,
-      count: 2,
+      allSelected: false,
+      count: 1,
       total: 2,
     })
     const checkboxes = fixture.scroll.querySelectorAll<HTMLButtonElement>('[data-dsh-share-turn-select]')
     expect(checkboxes).toHaveLength(4)
     expect([...checkboxes].map(button => `${button.dataset.turnId}:${button.dataset.dshShareTurnSelectKind}`))
       .toEqual(['1:question', '2:question', '1:answer', '2:answer'])
-    expect([...checkboxes].every(button => button.getAttribute('aria-checked') === 'true')).toBe(true)
+    expect([...checkboxes].filter(button => button.getAttribute('aria-checked') === 'true')
+      .map(button => button.dataset.turnId)).toEqual(['1', '1'])
     expect(fixture.column.querySelector(
       '[data-chat-flow-kind="user"] > [data-dsh-share-select-region="question"] [data-dsh-share-turn-select]',
     )).not.toBeNull()
@@ -368,7 +370,7 @@ describe('分享按钮运行时', () => {
     const footer = fixture.scroll.querySelector('[data-dsh-share-selection-footer]') as HTMLElement
     expect(footer).not.toBeNull()
     expect(footer.textContent).toContain('全选')
-    expect(footer.textContent).toContain('已选择 2 组对话')
+    expect(footer.textContent).toContain('已选择 1 组对话')
     expect(getComputedStyle(footer).height).toBe('66px')
     const markdown = footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-download]')
     const create = footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
@@ -381,6 +383,15 @@ describe('分享按钮运行时', () => {
     expect(create?.querySelector('[data-dsh-share-label="compact"]')?.textContent).toBe('生成图片')
     expect(create?.querySelector('svg')).toBeNull()
     expect(ShareAction(actionProps(runtime)).type).toBe(Tooltip)
+
+    // 全选后回到默认全选状态，覆盖全部问答组。
+    footer.querySelector<HTMLButtonElement>('[data-dsh-share-select-all]')!.click()
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      allSelected: true,
+      count: 2,
+      total: 2,
+    })
+    expect(footer.textContent).toContain('已选择 2 组对话')
 
     runtime.dispose()
   })
@@ -412,12 +423,20 @@ describe('分享按钮运行时', () => {
 
     expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
       active: true,
+      allSelected: false,
+      count: 1,
+      total: 2,
+    })
+    // 消息入口只预选当前段；全选后 steering 段与首轮一并导出。
+    ;(fixture.scroll.querySelector('[data-dsh-share-select-all]') as HTMLButtonElement).click()
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
       allSelected: true,
       count: 2,
       total: 2,
     })
     const checkboxes = fixture.scroll.querySelectorAll<HTMLButtonElement>('[data-dsh-share-turn-select]')
     expect(checkboxes).toHaveLength(4)
+    expect([...checkboxes].every(button => button.getAttribute('aria-checked') === 'true')).toBe(true)
     expect(fixture.column.querySelector(
       '[data-chat-flow-kind="steering"] > [data-dsh-share-select-region="question"] [data-dsh-share-turn-select]',
     )).not.toBeNull()
@@ -452,6 +471,9 @@ describe('分享按钮运行时', () => {
 
     expect(answerParts).toHaveLength(3)
     expect(getComputedStyle(toolControl as HTMLElement).pointerEvents).toBe('none')
+
+    // 消息入口只预选当前问答组；先点击回答正文取消，再点击问题正文重新选中整组。
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 1 })
 
     const answerClick = new MouseEvent('click', { bubbles: true, cancelable: true })
     answerParts[1]?.dispatchEvent(answerClick)
@@ -557,14 +579,23 @@ describe('分享按钮运行时', () => {
     const selectAll = fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-select-all]')
     const markdown = fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-selection-download]')
     const create = fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
+    // 消息入口只预选当前组；先点击当前组取消到零选择，再验证全选与清空。
+    first?.click()
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      allSelected: false,
+      count: 0,
+    })
+    expect(first?.getAttribute('aria-checked')).toBe('false')
+    expect([...firstPair].every(button => button.getAttribute('aria-checked') === 'false')).toBe(true)
+    expect(selectAll?.getAttribute('aria-checked')).toBe('false')
+    expect(markdown?.disabled).toBe(true)
+    expect(create?.disabled).toBe(true)
+
     first?.click()
     expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
       allSelected: false,
       count: 1,
     })
-    expect(first?.getAttribute('aria-checked')).toBe('false')
-    expect([...firstPair].every(button => button.getAttribute('aria-checked') === 'false')).toBe(true)
-    expect(selectAll?.getAttribute('aria-checked')).toBe('false')
 
     selectAll?.click()
     expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
@@ -608,10 +639,10 @@ describe('分享按钮运行时', () => {
       return new Blob(['png'], { type: 'image/png' })
     })
     const runtime = createShareRuntime(document, { renderImage })
+    // 消息入口预选当前组 third；全选后取消 2，保留 1+3 的不连续组合。
     triggerShareAction(thirdTail, runtime, 'message-third')
     ;(fixture.scroll.querySelector('[data-dsh-share-select-all]') as HTMLButtonElement).click()
-    ;(fixture.scroll.querySelector('[data-turn-id="1"]') as HTMLButtonElement).click()
-    ;(fixture.scroll.querySelector('[data-turn-id="3"]') as HTMLButtonElement).click()
+    ;(fixture.scroll.querySelector('[data-turn-id="2"]') as HTMLButtonElement).click()
 
     const markdownButton = fixture.scroll.querySelector(
       '[data-dsh-share-selection-download]',
@@ -662,7 +693,7 @@ describe('分享按钮运行时', () => {
     runtime.dispose()
   })
 
-  it('新消息渲染后补上选择框，并遵守用户当前的全选意图', async () => {
+  it('新消息渲染后补上选择框，并遵守用户当前的取消意图', async () => {
     const fixture = createConversation()
     const tail = addTurn(fixture, 'first', 1)
     const runtime = createShareRuntime(document)
@@ -670,13 +701,14 @@ describe('分享按钮运行时', () => {
 
     addTurn(fixture, 'second', 2)
     await vi.waitFor(() => {
-      expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 2, total: 2 })
+      expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 1, total: 2 })
     })
+    expect(fixture.scroll.querySelector('[data-turn-id="2"]')?.getAttribute('aria-checked')).toBe('false')
 
     ;(fixture.scroll.querySelector('[data-turn-id="1"]') as HTMLButtonElement).click()
     addTurn(fixture, 'third', 3)
     await vi.waitFor(() => {
-      expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 1, total: 3 })
+      expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 0, total: 3 })
     })
     expect(fixture.scroll.querySelector('[data-turn-id="3"]')?.getAttribute('aria-checked')).toBe('false')
 
@@ -793,9 +825,10 @@ describe('分享按钮运行时', () => {
     triggerShareAction(thirdTail, runtime, 'message-third')
     expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
       active: true,
-      count: 3,
+      count: 1,
       total: 3,
     })
+    expect(runtime.selectionFor('session-1').getSnapshot().selectedIds).toEqual(new Set(['3']))
 
     runtime.dispose()
   })
