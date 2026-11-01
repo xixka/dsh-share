@@ -484,7 +484,7 @@ describe('分享按钮运行时', () => {
     const questionClick = new MouseEvent('click', { bubbles: true, cancelable: true })
     question?.dispatchEvent(questionClick)
     expect(questionClick.defaultPrevented).toBe(true)
-    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 2 })
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 1 })
     expect([...firstPair].every(button => button.getAttribute('aria-checked') === 'true')).toBe(true)
 
     ;(fixture.scroll.querySelector('[data-dsh-share-selection-cancel]') as HTMLButtonElement).click()
@@ -821,8 +821,10 @@ describe('分享按钮运行时', () => {
     })
 
     ;(document.querySelector('[data-dsh-share-close]') as HTMLButtonElement).click()
-    // 关闭“分享直接生成图片”后，消息入口回到多选流程，且只预选当前组。
-    window.localStorage.setItem('dsh-share.direct-single-turn', 'false')
+    // 预览弹窗里的开关会把 directSingleTurn 缓存在 dialog 上；点击开关同步关闭，消息入口回到多选流程。
+    const directToggle = document.querySelector('[data-dsh-share-direct-single-turn]') as HTMLInputElement
+    directToggle.click()
+    expect(window.localStorage.getItem('dsh-share.direct-single-turn')).toBe('false')
     const thirdTail = fixture.column.querySelector('[data-turn-tail="3"]') as HTMLElement
     triggerShareAction(thirdTail, runtime, 'message-third')
     expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
