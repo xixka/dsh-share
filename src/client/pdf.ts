@@ -119,8 +119,8 @@ function assemblePdf(pages: readonly PdfPage[], now: Date): Blob {
     const colorSpace = pngColorSpace(image.colorType)
     // Predictor 的 Colors 必须是每像素通道数：Gray=1、RGB=3、Gray+Alpha=2、RGBA=4。
     const colors = image.colorType === 0 ? 1 : image.colorType === 2 ? 3 : image.colorType === 4 ? 2 : 4
-    // /Decode 让带 Alpha 的 PNG 按预乘不透明处理：透明底叠在页面白底上，观感与预览一致。
-    const decode = image.colorType === 4 || image.colorType === 6 ? ' /Decode [0 1 0 1 0 1 0 1]' : ''
+    // /Decode 按 PDF 规范翻转 Alpha 通道（每组一个色/alpha 分量）；Gray+Alpha 2 组、RGBA 4 组。
+    const decode = image.colorType === 4 ? ' /Decode [0 1 0 1]' : image.colorType === 6 ? ' /Decode [0 1 0 1 0 1 0 1]' : ''
 
     beginObject(imageId(index))
     push(asciiBytes(
