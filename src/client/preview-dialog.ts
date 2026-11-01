@@ -744,7 +744,7 @@ export class PreviewDialog {
     this.downloadButton.disabled = true
     this.status.textContent = t(this.options.getLocale()).docxExporting
     try {
-      const blob = await renderPagesToDocx(pages, title, now, job.signal)
+      const blob = await createPagesDocx(pages, title, now, job.signal)
       if (job.signal.aborted || !this.element.isConnected) return
       const url = URL.createObjectURL(blob)
       const anchor = this.document.createElement('a')
