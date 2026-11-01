@@ -20,7 +20,7 @@ export declare function apply(ctx: Context): void;
 export { createShareCard } from './card.ts';
 export { createShareMarkdown } from './markdown.ts';
 export { findTurnContent, findTurnContentFromAction } from './dom.ts';
-export { renderShareImage, type ImageRenderer } from './preview-dialog.ts';
+export { renderShareImage, renderSharePdf, type ImageRenderer } from './preview-dialog.ts';
 export { createShareRuntime, type InstallOptions, type ShareRuntime, type ShareSelectionSnapshot, } from './runtime.ts';
 export { DEFAULT_SHARE_SETTINGS, FONT_SIZE_PRESETS, loadShareSettings, saveShareSettings, WIDTH_PRESETS, type FontSizePreset, type ShareSettings, type WidthPreset, } from './settings.ts';
 //# sourceMappingURL=index.d.ts.map

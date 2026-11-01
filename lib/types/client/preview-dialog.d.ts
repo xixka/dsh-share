@@ -4,6 +4,8 @@ import { type ShareSettings } from './settings.ts';
 export declare function markUnembeddableImages(card: HTMLElement, locale: 'zh' | 'en'): Promise<number>;
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>;
 export declare function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]>;
+/** PDF 导出走同一渲染管线：先渲染为分页 PNG，再原样装配成单文件 PDF。 */
+export declare function renderSharePdf(element: HTMLElement, title?: string, now?: Date): Promise<Blob>;
 export declare function downloadMarkdownFile(document: Document, markdown: string, title?: string): void;
 /** 下载独立HTML文档，给宿主留出读取Blob的时间。 */
 export declare function downloadHtmlFile(document: Document, html: string, title?: string): void;
@@ -12,6 +14,8 @@ interface PreviewDialogOptions {
     getLocale(): ShareLocale;
     onSettingsChange(settings: ShareSettings): void;
     onDismiss(): void;
+    /** 与预览同一渲染管线生成 PDF；由运行时注入以复用卡片构建逻辑。 */
+    renderPdf(content: readonly unknown[], locale: ShareLocale): Promise<Blob>;
 }
 export declare class PreviewDialog {
     private readonly document;
@@ -23,6 +27,7 @@ export declare class PreviewDialog {
     private readonly status;
     private readonly copyButton;
     private readonly downloadButton;
+    private readonly downloadPdfButton;
     private readonly downloadAllButton;
     private readonly directSingleTurnInput;
     private readonly hideProcessInput;
@@ -44,6 +49,11 @@ export declare class PreviewDialog {
     constructor(document: Document, options: PreviewDialogOptions);
     get settings(): ShareSettings;
     get directSingleTurn(): boolean;
+    /**
+     * PDF 导出的统一入口：由运行时提供与弹窗一致的渲染管线回调，
+     * 避免把卡片构建和 GenUI 静态化逻辑复制到两处。
+     */
+    renderPagesForPdf(content: readonly unknown[], locale: ShareLocale): Promise<Blob>;
     /** 弹窗会跨语言切换复用；每次显示前都从 DSH 官方 locale 刷新静态文案。 */
     private updateCopy;
     showLoading(turnCount: number, preservePreview?: boolean, selectionExport?: boolean): void;
@@ -67,6 +77,8 @@ export declare class PreviewDialog {
     private copy;
     private download;
     private cancelArchive;
+    /** 把当前全部分页装配为单文件 PDF；页面即预览中的 PNG，观感逐像素一致。 */
+    private downloadPdf;
     /** 一次保存全部分页，避免多次自动下载被宿主丢弃。 */
     private downloadAll;
 }

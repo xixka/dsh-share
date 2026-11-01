@@ -26,10 +26,13 @@ export interface Translation {
     download: string;
     downloadMarkdown: string;
     downloadHtml: string;
+    downloadPdf: string;
     downloadFile: string;
     downloadFormat: string;
     htmlExporting: string;
     htmlExportFailed: string;
+    pdfExporting: string;
+    pdfExportFailed: string;
     htmlMissingImages: string;
     imageMissingImages(count: number): string;
     markdownExporting: string;
