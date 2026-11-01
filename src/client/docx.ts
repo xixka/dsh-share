@@ -240,7 +240,7 @@ function blocksToXml(blocks: readonly WordBlock[]): string {
 }
 
 /** 纯 Store ZIP 装配（与 zip.ts 同构，支持 UTF-8 文件名和空压缩方法）。 */
-async function storeZip(entries: ReadonlyArray<{ name: string; content: Uint8Array }>, now: Date): Promise<Blob> {
+async function storeZip(entries: ReadonlyArray<{ name: string; content: Uint8Array<ArrayBuffer> }>, now: Date): Promise<Blob> {
   const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
     for (let bit = 0; bit < 8; bit++) value = (value >>> 1) ^ ((value & 1) ? 0xedb88320 : 0)
     return value >>> 0
