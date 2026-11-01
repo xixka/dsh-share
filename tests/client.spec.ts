@@ -478,7 +478,7 @@ describe('分享按钮运行时', () => {
     const answerClick = new MouseEvent('click', { bubbles: true, cancelable: true })
     answerParts[1]?.dispatchEvent(answerClick)
     expect(answerClick.defaultPrevented).toBe(true)
-    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 1 })
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 0 })
     expect([...firstPair].every(button => button.getAttribute('aria-checked') === 'false')).toBe(true)
 
     const questionClick = new MouseEvent('click', { bubbles: true, cancelable: true })
@@ -821,6 +821,8 @@ describe('分享按钮运行时', () => {
     })
 
     ;(document.querySelector('[data-dsh-share-close]') as HTMLButtonElement).click()
+    // 关闭“分享直接生成图片”后，消息入口回到多选流程，且只预选当前组。
+    window.localStorage.setItem('dsh-share.direct-single-turn', 'false')
     const thirdTail = fixture.column.querySelector('[data-turn-tail="3"]') as HTMLElement
     triggerShareAction(thirdTail, runtime, 'message-third')
     expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
