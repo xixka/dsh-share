@@ -424,7 +424,7 @@ describe('分享图片卡片', () => {
       const chips = card.element.querySelectorAll('p code span')
       expect(chips).toHaveLength(2)
       expect(chips[0]!.className).toBe('fileMention')
-      expect(chips[0]!.getAttribute('title')).toBe('E:\\greenGo\\index.html')
+      expect(chips[0]!.hasAttribute('title')).toBe(false)
       expect(chips[0]!.hasAttribute('aria-label')).toBe(false)
       expect(chips[0]!.querySelector('svg')).not.toBeNull()
       expect(chips[0]!.textContent).toBe('index.html')
