@@ -293,7 +293,15 @@ async function storeZip(entries: ReadonlyArray<{ name: string; content: Uint8Arr
   endView.setUint16(10, entries.length, true)
   endView.setUint32(12, directorySize, true)
   endView.setUint32(16, offset, true)
-  return new Blob([...local, ...central, end], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+  // 单一 Blob part：规避 jsdom 等旧实现把多个 Uint8Array part 拼接错位的兼容问题。
+  const total = offset + directorySize + end.length
+  const bytes = new Uint8Array(total)
+  let cursor = 0
+  for (const part of [...local, ...central, end]) {
+    bytes.set(part, cursor)
+    cursor += part.length
+  }
+  return new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
 }
 
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

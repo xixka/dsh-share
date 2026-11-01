@@ -13,7 +13,7 @@ function message(html: string, role: 'user' | 'assistant' = 'assistant', turn = 
   return { elements: [element], role, turn, order: turn * 2, omittedBefore: 0 }
 }
 
-/** 解包 Store ZIP；返回 文件名 -> 文本 与原始字节。 */
+/** 解包 Store ZIP；从 central directory 定位条目，返回 文件名 -> 文本 与原始字节。 */
 async function unpack(blob: Blob): Promise<Map<string, { text: string; bytes: Uint8Array }>> {
   const raw = await new Promise<ArrayBuffer>((resolve, reject) => {
     const reader = new FileReader()
@@ -23,15 +23,27 @@ async function unpack(blob: Blob): Promise<Map<string, { text: string; bytes: Ui
   })
   const bytes = new Uint8Array(raw)
   const view = new DataView(bytes.buffer)
+  // 从尾部找 EOCD 签名
+  let eocd = bytes.length - 22
+  while (eocd >= 0 && view.getUint32(eocd, true) !== 0x06054b50) eocd -= 1
+  if (eocd < 0) throw new Error('EOCD not found')
+  const count = view.getUint16(eocd + 10, true)
+  let header = view.getUint32(eocd + 16, true)
   const files = new Map<string, { text: string; bytes: Uint8Array }>()
-  let offset = 0
-  while (offset + 30 <= bytes.length && view.getUint32(offset, true) === 0x04034b50) {
-    const nameLength = view.getUint16(26, true)
-    const contentLength = view.getUint32(18, true)
-    const name = new TextDecoder().decode(bytes.subarray(offset + 30, offset + 30 + nameLength))
-    const content = bytes.subarray(offset + 30 + nameLength, offset + 30 + nameLength + contentLength)
+  for (let index = 0; index < count; index++) {
+    if (view.getUint32(header, true) !== 0x02014b50) break
+    const nameLength = view.getUint16(header + 28, true)
+    const extraLength = view.getUint16(header + 30, true)
+    const commentLength = view.getUint16(header + 32, true)
+    const localOffset = view.getUint32(header + 42, true)
+    const name = new TextDecoder().decode(bytes.subarray(header + 46, header + 46 + nameLength))
+    const localNameLength = view.getUint16(localOffset + 26, true)
+    const localExtraLength = view.getUint16(localOffset + 28, true)
+    const contentStart = localOffset + 30 + localNameLength + localExtraLength
+    const contentLength = view.getUint32(localOffset + 18, true)
+    const content = bytes.subarray(contentStart, contentStart + contentLength)
     files.set(name, { text: Buffer.from(content).toString('utf8'), bytes: content })
-    offset += 30 + nameLength + contentLength
+    header += 46 + nameLength + extraLength + commentLength
   }
   return files
 }
