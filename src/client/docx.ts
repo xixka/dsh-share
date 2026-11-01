@@ -297,7 +297,7 @@ async function storeZip(entries: ReadonlyArray<{ name: string; content: Uint8Arr
   const total = offset + directorySize + end.length
   const bytes = new Uint8Array(total)
   let cursor = 0
-  for (const part of [...local, ...central, end]) {
+  for (const part of [...local, ...central, end] as Uint8Array<ArrayBuffer>[]) {
     bytes.set(part, cursor)
     cursor += part.length
   }
