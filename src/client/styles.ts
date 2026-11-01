@@ -464,6 +464,16 @@ div:has([data-dsh-share-button]) > span { order: 2; }
   border-color: var(--dsw-alias-button-primary-hover, #405bea);
 }
 .dsh-share-dialog__action:disabled { cursor: not-allowed; opacity: .45; }
+.dsh-share-dialog__format {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, .28));
+  border-radius: var(--dsw-radius-md, 8px);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 10px;
+}
 [data-dsh-share-card] [data-dsh-share-message],
 [data-dsh-share-card] [data-dsh-share-message] :where(div, p, li, table, blockquote, td, th) {
   font-size: var(--dsh-share-font-size) !important;

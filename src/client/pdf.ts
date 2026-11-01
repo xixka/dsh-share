@@ -39,7 +39,7 @@ function asciiBytes(text: string): Uint8Array {
 }
 
 /** 逐块扫描 PNG，抽取 IHDR 元数据和 IDAT 像素流；非 PNG 输入返回 undefined。 */
-function parsePng(blob: ArrayBuffer): (PngImage & { colorType: number }) | undefined {
+export function parsePng(blob: ArrayBuffer): (PngImage & { colorType: number }) | undefined {
   const bytes = new Uint8Array(blob) as Uint8Array<ArrayBuffer>
   const view = new DataView(blob)
   if (bytes.length < 33 || view.getUint32(0) !== PNG_SIGNATURE) return undefined

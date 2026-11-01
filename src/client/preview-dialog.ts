@@ -2,6 +2,7 @@ import { toBlob } from 'html-to-image'
 import { createDownloadFilename } from './filename.ts'
 import { createPagesZip } from './zip.ts'
 import { createPagesPdf } from './pdf.ts'
+import { createPagesDocx } from './docx.ts'
 import { shareExportBackground } from './background.ts'
 import { t, type ShareLocale, type Translation } from './i18n.ts'
 import { createSharePages } from './pagination.ts'
@@ -101,6 +102,9 @@ const MAX_IMAGE_SIDE = 32767
 const MAX_IMAGE_AREA = 32 * 1024 * 1024
 const IMAGE_PIXEL_RATIOS = [2, 1, 0.5, 0.25, 0.125] as const
 
+/** 弹窗图片格式下拉的可选产物。 */
+export type ImageDownloadFormat = 'png' | 'zip' | 'pdf' | 'docx'
+
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>
 
 export async function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]> {
@@ -190,7 +194,7 @@ export class PreviewDialog {
   private readonly status: HTMLElement
   private readonly copyButton: HTMLButtonElement
   private readonly downloadButton: HTMLButtonElement
-  private readonly downloadPdfButton: HTMLButtonElement
+  private readonly imageFormatSelect: HTMLSelectElement
   private readonly downloadAllButton: HTMLButtonElement
   private readonly directSingleTurnInput: HTMLInputElement
   private readonly hideProcessInput: HTMLInputElement
@@ -263,8 +267,8 @@ export class PreviewDialog {
           <button class="dsh-share-dialog__action" data-dsh-share-next type="button"></button>
         </span>
         <span class="dsh-share-dialog__status" data-dsh-share-status role="status"></span>
+        <select class="dsh-share-dialog__format" data-dsh-share-image-format aria-label=""></select>
         <button class="dsh-share-dialog__action" data-dsh-share-download type="button"></button>
-        <button class="dsh-share-dialog__action" data-dsh-share-download-pdf type="button"></button>
         <button class="dsh-share-dialog__action" data-dsh-share-download-all type="button" hidden disabled></button>
         <button class="dsh-share-dialog__action dsh-share-dialog__action--primary" data-dsh-share-copy type="button"></button>
       </div>`
@@ -282,7 +286,7 @@ export class PreviewDialog {
     this.nextPage.addEventListener('click', () => this.selectPage(this.pageIndex + 1))
     this.copyButton = dialog.querySelector('[data-dsh-share-copy]') as HTMLButtonElement
     this.downloadButton = dialog.querySelector('[data-dsh-share-download]') as HTMLButtonElement
-    this.downloadPdfButton = dialog.querySelector('[data-dsh-share-download-pdf]') as HTMLButtonElement
+    this.imageFormatSelect = dialog.querySelector('[data-dsh-share-image-format]') as HTMLSelectElement
     this.downloadAllButton = dialog.querySelector('[data-dsh-share-download-all]') as HTMLButtonElement
     this.directSingleTurnInput = dialog.querySelector('[data-dsh-share-direct-single-turn]') as HTMLInputElement
     this.hideProcessInput = dialog.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
@@ -324,7 +328,20 @@ export class PreviewDialog {
     close.ariaLabel = strings.close
     this.copyButton.textContent = strings.copy
     this.downloadButton.textContent = strings.download
-    this.downloadPdfButton.textContent = strings.downloadPdf
+    // 图片格式下拉：PNG（当前页）/ ZIP（全部页）/ PDF / Word。
+    const formatChoices: Array<[ImageDownloadFormat, string]> = [
+      ['png', strings.download],
+      ['zip', strings.downloadAll],
+      ['pdf', strings.downloadPdf],
+      ['docx', strings.downloadDocx],
+    ]
+    this.imageFormatSelect.replaceChildren(...formatChoices.map(([value, label]) => {
+      const option = this.document.createElement('option')
+      option.value = value
+      option.textContent = label
+      return option
+    }))
+    this.imageFormatSelect.ariaLabel = strings.downloadFormat
     this.downloadAllButton.textContent = strings.downloadAll
     this.downloadAllButton.title = strings.downloadAllHint
 
@@ -337,8 +354,7 @@ export class PreviewDialog {
       this.options.onDismiss()
     })
     this.copyButton.addEventListener('click', () => void this.copy())
-    this.downloadButton.addEventListener('click', () => this.download())
-    this.downloadPdfButton.addEventListener('click', () => void this.downloadPdf())
+    this.downloadButton.addEventListener('click', () => void this.downloadImage())
     this.downloadAllButton.addEventListener('click', () => void this.downloadAll())
     this.directSingleTurnInput.addEventListener('change', () => {
       this.currentDirectSingleTurn = this.directSingleTurnInput.checked
@@ -408,7 +424,13 @@ export class PreviewDialog {
     }
     this.copyButton.textContent = strings.copy
     this.downloadButton.textContent = strings.download
-    this.downloadPdfButton.textContent = strings.downloadPdf
+    for (const option of this.imageFormatSelect.options) {
+      option.textContent = option.value === 'png' ? strings.download
+        : option.value === 'zip' ? strings.downloadAll
+        : option.value === 'pdf' ? strings.downloadPdf
+        : strings.downloadDocx
+    }
+    this.imageFormatSelect.ariaLabel = strings.downloadFormat
     this.downloadAllButton.textContent = strings.downloadAll
     this.downloadAllButton.title = strings.downloadAllHint
     if (this.pages.length) this.selectPage(this.pageIndex)
@@ -427,7 +449,7 @@ export class PreviewDialog {
     this.element.ariaBusy = 'true'
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
-    this.downloadPdfButton.disabled = true
+    this.downloadButton.disabled = true
     this.downloadAllButton.disabled = true
 
     if (canPreserve) {
@@ -454,7 +476,7 @@ export class PreviewDialog {
     this.element.ariaBusy = 'true'
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
-    this.downloadPdfButton.disabled = true
+    this.downloadButton.disabled = true
     this.downloadAllButton.disabled = true
     if (canPreserve) {
       this.message.hidden = true
@@ -510,7 +532,7 @@ export class PreviewDialog {
     this.element.ariaBusy = 'false'
     this.copyButton.disabled = false
     this.downloadButton.disabled = false
-    this.downloadPdfButton.disabled = false
+    this.downloadButton.disabled = false
     this.downloadAllButton.disabled = false
 
     // 新图已进入解码缓存；延后一帧释放旧 URL，保证浏览器完成原位绘制。
@@ -548,7 +570,7 @@ export class PreviewDialog {
       this.status.textContent = strings.updateFailed
       this.copyButton.disabled = false
       this.downloadButton.disabled = false
-      this.downloadPdfButton.disabled = false
+      this.downloadButton.disabled = false
       this.downloadAllButton.disabled = false
       this.open()
       return
@@ -560,7 +582,7 @@ export class PreviewDialog {
     this.image.hidden = true
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
-    this.downloadPdfButton.disabled = true
+    this.downloadButton.disabled = true
     this.downloadAllButton.disabled = true
     this.open()
   }
@@ -654,7 +676,7 @@ export class PreviewDialog {
     this.pager.hidden = true
     this.downloadAllButton.hidden = true
     this.downloadAllButton.disabled = true
-    this.downloadPdfButton.disabled = true
+    this.downloadButton.disabled = true
     this.objectUrl = undefined
     this.image.removeAttribute('src')
     this.status.textContent = ''
@@ -693,15 +715,66 @@ export class PreviewDialog {
     this.archiveJob = undefined
   }
 
-  /** 把当前全部分页装配为单文件 PDF；页面即预览中的 PNG，观感逐像素一致。 */
-  private async downloadPdf(): Promise<void> {
-    if (this.downloadPdfButton.disabled || !this.pages.length || this.archiveJob) return
+  /** 图片格式下拉统一分发：当前页 PNG / 全部页 ZIP / PDF / Word。 */
+  private async downloadImage(): Promise<void> {
+    const format = this.imageFormatSelect.value as ImageDownloadFormat
+    if (format === 'zip') {
+      await this.downloadAll()
+      return
+    }
+    if (format === 'pdf') {
+      await this.downloadPdf()
+      return
+    }
+    if (format === 'docx') {
+      await this.downloadDocx()
+      return
+    }
+    this.download()
+  }
+
+  /** 把当前全部分页装配为单文件 DOCX；内容与图片一致且可编辑。 */
+  private async downloadDocx(): Promise<void> {
+    if (!this.pages.length || this.archiveJob) return
     const job = new AbortController()
     this.archiveJob = job
     const pages = [...this.pages]
     const title = this.options.getConversationTitle?.()
     const now = new Date()
-    this.downloadPdfButton.disabled = true
+    this.downloadButton.disabled = true
+    this.status.textContent = t(this.options.getLocale()).docxExporting
+    try {
+      const blob = await renderPagesToDocx(pages, title, now, job.signal)
+      if (job.signal.aborted || !this.element.isConnected) return
+      const url = URL.createObjectURL(blob)
+      const anchor = this.document.createElement('a')
+      anchor.href = url
+      anchor.download = createDownloadFilename('docx', title, undefined, now)
+      try {
+        anchor.click()
+      } finally {
+        this.document.defaultView?.setTimeout(() => URL.revokeObjectURL(url), 60000)
+      }
+      this.status.textContent = ''
+    } catch {
+      if (!job.signal.aborted) this.status.textContent = t(this.options.getLocale()).docxExportFailed
+    } finally {
+      if (this.archiveJob === job) {
+        this.archiveJob = undefined
+        this.downloadButton.disabled = !this.pages.length || this.element.ariaBusy === 'true'
+      }
+    }
+  }
+
+  /** 把当前全部分页装配为单文件 PDF；页面即预览中的 PNG，观感逐像素一致。 */
+  private async downloadPdf(): Promise<void> {
+    if (!this.pages.length || this.archiveJob) return
+    const job = new AbortController()
+    this.archiveJob = job
+    const pages = [...this.pages]
+    const title = this.options.getConversationTitle?.()
+    const now = new Date()
+    this.downloadButton.disabled = true
     this.status.textContent = t(this.options.getLocale()).pdfExporting
     try {
       const blob = await createPagesPdf(pages, title, now, job.signal)
@@ -721,14 +794,14 @@ export class PreviewDialog {
     } finally {
       if (this.archiveJob === job) {
         this.archiveJob = undefined
-        this.downloadPdfButton.disabled = !this.pages.length || this.element.ariaBusy === 'true'
+        this.downloadButton.disabled = !this.pages.length || this.element.ariaBusy === 'true'
       }
     }
   }
 
   /** 一次保存全部分页，避免多次自动下载被宿主丢弃。 */
   private async downloadAll(): Promise<void> {
-    if (this.downloadAllButton.disabled || this.pages.length < 2 || this.archiveJob) return
+    if (this.pages.length < 2 || this.archiveJob) return
     const job = new AbortController()
     this.archiveJob = job
     const pages = [...this.pages]

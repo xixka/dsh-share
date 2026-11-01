@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
-import { createShareDocx, DOCX_BODY_COLOR, DOCX_HALF_POINTS } from '../src/client/docx.ts'
+import { deflateSync } from 'node:zlib'
+import { createPagesDocx, createShareDocx, DOCX_BODY_COLOR, DOCX_HALF_POINTS } from '../src/client/docx.ts'
 import { DEFAULT_SHARE_SETTINGS } from '../src/client/settings.ts'
 import type { ShareMessage } from '../src/client/content.ts'
 
@@ -115,4 +116,66 @@ describe('DOCX 装配', () => {
     expect(documentXml).toContain('最终回答')
     expect(documentXml).not.toContain('思考')
   })
+
+  it('分页 PNG 嵌入为可编辑 Word：媒体部件、关系项和 drawing 齐全', async () => {
+    const blob = await createPagesDocx([makePng(120, 80, 2), makePng(100, 60, 2)], '测试对话', new Date(2026, 10, 1))
+    const files = await unpack(blob)
+    const documentXml = files.get('word/document.xml')!.text
+    expect(files.has('word/media/page-01.png')).toBe(true)
+    expect(files.has('word/media/page-02.png')).toBe(true)
+    expect(files.get('word/_rels/document.xml.rels')!.text).toContain('Target="media/page-01.png"')
+    expect(documentXml).toContain('<a:blip r:embed="rIdImage1"/>')
+    expect(documentXml).toContain('<a:blip r:embed="rIdImage2"/>')
+    expect(documentXml).toContain('cx="1143000"')
+    expect(documentXml).toContain('<w:t xml:space="preserve">测试对话</w:t>')
+    // 隔行 PNG 拒绝
+    await expect(createPagesDocx([makePng(10, 10, 2, 1)])).rejects.toThrow('not a valid PNG')
+  })
+})
+
+/** 构造最小 PNG（IHDR + IDAT + IEND），与 pdf.spec 同构。 */
+function makePng(width: number, height: number, colorType: 0 | 2 | 4 | 6, interlace = 0): Blob {
+  const channels = colorType === 0 ? 1 : colorType === 2 ? 3 : colorType === 4 ? 2 : 4
+  const raw = new Uint8Array(height * (1 + width * channels))
+  for (let row = 0; row < height; row++) raw[row * (1 + width * channels)] = 0
+  const compressed = deflateSync(raw)
+  const ihdr = new Uint8Array(13)
+  const ihdrView = new DataView(ihdr.buffer)
+  ihdrView.setUint32(0, width)
+  ihdrView.setUint32(4, height)
+  ihdr[8] = 8
+  ihdr[9] = colorType
+  ihdr[12] = interlace
+  const chunk = (type: string, data: Uint8Array): Uint8Array => {
+    const out = new Uint8Array(12 + data.length)
+    const view = new DataView(out.buffer)
+    view.setUint32(0, data.length)
+    for (let index = 0; index < 4; index++) out[4 + index] = type.charCodeAt(index)
+    out.set(data, 8)
+    let crc = 0xffffffff
+    for (const byte of out.subarray(4, 8 + data.length)) {
+      crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ byte) & 255]!
+    }
+    view.setUint32(out.length - 4, (crc ^ 0xffffffff) >>> 0)
+    return out
+  }
+  const bytes = [
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', compressed),
+    chunk('IEND', new Uint8Array()),
+  ]
+  const total = bytes.reduce((sum, part) => sum + part.length, 0)
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const part of bytes) {
+    out.set(part, offset)
+    offset += part.length
+  }
+  return new Blob([out], { type: 'image/png' })
+}
+
+const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
+  for (let bit = 0; bit < 8; bit++) value = (value >>> 1) ^ ((value & 1) ? 0xedb88320 : 0)
+  return value >>> 0
 })

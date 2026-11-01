@@ -1,5 +1,6 @@
 import { createDownloadFilename } from './filename.ts'
 import { escapeXml } from './docx-xml.ts'
+import { parsePng } from './pdf.ts'
 import type { ShareMessage } from './content.ts'
 import { cloneShareMessage, visibleAssistantElements } from './card.ts'
 import type { ShareSettings } from './settings.ts'
@@ -308,8 +309,9 @@ async function storeZip(entries: ReadonlyArray<{ name: string; content: Uint8Arr
   return new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
 }
 
+const CONTENT_TYPES_MEDIA = '<Default Extension="png" ContentType="image/png"/>'
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${CONTENT_TYPES_MEDIA}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`
 
 const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`
@@ -360,18 +362,110 @@ export async function createShareDocx(
     }
   }
 
+  // 字号档位通过 styles.xml 的 Normal 默认字号体现：半点 = px * 1.5（16px → 24 半点）。
   const halfPoints = WORD_FONT_HALF_POINTS[settings.fontSize] ?? 24
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${blocksToXml(blocks)}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>`
 
+  return packageDocx({ bodyXml: documentXml, images: [], defaultHalfPoints: halfPoints }, new Date())
+}
+
+interface DocxImage {
+  name: string
+  bytes: Uint8Array<ArrayBuffer>
+  width: number
+  height: number
+}
+
+interface DocxDocument {
+  bodyXml: string
+  images: DocxImage[]
+  /** Normal 样式默认字号（半点），随图片导出的字号档位变化。 */
+  defaultHalfPoints?: number
+}
+
+/** 组装 DOCX 包：文档主体 + 可选媒体部件与关系项。 */
+async function packageDocx(doc: DocxDocument, now: Date): Promise<Blob> {
   const encoder = new TextEncoder()
-  return storeZip([
+  const stylesXml = doc.defaultHalfPoints === undefined
+    ? STYLES_XML
+    : STYLES_XML.replace(
+        '<w:style w:type="paragraph" w:styleId="Normal" w:default="1"><w:name w:val="Normal"/></w:style>',
+        `<w:style w:type="paragraph" w:styleId="Normal" w:default="1"><w:name w:val="Normal"/><w:rPr><w:sz w:val="${doc.defaultHalfPoints}"/></w:rPr></w:style>`,
+      )
+  const imageRels = doc.images.map((image, index) =>
+    `<Relationship Id="rIdImage${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${image.name}"/>`).join('')
+  const documentRels = imageRels
+    ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${imageRels}</Relationships>`
+    : DOCUMENT_RELS
+  const entries: Array<{ name: string; content: Uint8Array<ArrayBuffer> }> = [
     { name: '[Content_Types].xml', content: encoder.encode(CONTENT_TYPES) },
     { name: '_rels/.rels', content: encoder.encode(ROOT_RELS) },
-    { name: 'word/document.xml', content: encoder.encode(documentXml) },
-    { name: 'word/_rels/document.xml.rels', content: encoder.encode(DOCUMENT_RELS) },
-    { name: 'word/styles.xml', content: encoder.encode(STYLES_XML) },
-  ], new Date())
+    { name: 'word/document.xml', content: encoder.encode(doc.bodyXml) },
+    { name: 'word/_rels/document.xml.rels', content: encoder.encode(documentRels) },
+    { name: 'word/styles.xml', content: encoder.encode(stylesXml) },
+  ]
+  for (const image of doc.images) entries.push({ name: `word/media/${image.name}`, content: image.bytes })
+  return storeZip(entries, now)
+}
+
+/**
+ * 把分页 PNG 嵌入为可编辑 Word 文档：每页一张居中图片，页与页之间可插入文字。
+ * 视觉与导出图片一致（嵌入的就是那些 PNG），文档本身可编辑、可复制。
+ */
+export async function createPagesDocx(pages: readonly Blob[], title?: string, now = new Date(), signal?: AbortSignal): Promise<Blob> {
+  if (!pages.length || pages.length > 10000 || pages.reduce((sum, page) => sum + page.size, 0) > 512 * 1024 * 1024) {
+    throw new Error('Archive exceeds export budget')
+  }
+  const images: DocxImage[] = []
+  const paragraphs: string[] = []
+  const heading = (title ?? '').trim().slice(0, 100)
+  if (heading) {
+    paragraphs.push(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">${escapeXml(heading)}</w:t></w:r></w:p>`)
+  }
+  for (const [index, page] of pages.entries()) {
+    signal?.throwIfAborted()
+    const buffer = await readPngBytes(page)
+    const image = parsePng(buffer)
+    // 预览页始终是插件自己生成的 PNG；异常输入直接失败而不是产出坏页。
+    if (!image) throw new Error('Share page is not a valid PNG')
+    const name = `page-${String(index + 1).padStart(2, '0')}.png`
+    images.push({ name, bytes: new Uint8Array(buffer), width: image.width, height: image.height })
+    const relId = `rIdImage${index + 1}`
+    // EMU：1px = 9525 EMU（96dpi）；A4 内容区宽约 6.55 英寸，等比缩放不裁切。
+    const maxContentEmu = 5996160
+    const widthEmu = Math.min(image.width * 9525, maxContentEmu)
+    const heightEmu = Math.round(widthEmu * image.height / image.width)
+    paragraphs.push(
+      `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing>`
+      + `<wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">`
+      + `<wp:extent cx="${widthEmu}" cy="${heightEmu}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>`
+      + `<wp:docPr id="${index + 1}" name="${name}"/>`
+      + `<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>`
+      + `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">`
+      + `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">`
+      + `<pic:nvPicPr><pic:cNvPr id="${index + 1}" name="${name}"/><pic:cNvPicPr/></pic:nvPicPr>`
+      + `<pic:blipFill><a:blip r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
+      + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${widthEmu}" cy="${heightEmu}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`
+      + `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`,
+    )
+  }
+
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${paragraphs.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>`
+  return packageDocx({ bodyXml: documentXml, images }, now)
+}
+
+/** 读取 Blob 字节（PNG 解析用）；与 pdf.ts 同一套兼容逻辑。 */
+async function readPngBytes(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === 'function') return blob.arrayBuffer()
+  return await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as ArrayBuffer)
+    reader.onerror = () => reject(new Error('Could not read page bytes'))
+    reader.readAsArrayBuffer(blob)
+  })
 }
 
 /** 下载 DOCX，命名与其它导出一致。 */
